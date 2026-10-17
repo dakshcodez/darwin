@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { createClient, type Sandbox, type CreateosSandboxClient } from "@nodeops-createos/sandbox";
 import type { Config } from "./config.js";
 
@@ -74,6 +78,19 @@ export async function pushFiles(box: Box, files: Record<string, string>): Promis
     if (!path.startsWith("/")) throw new Error(`pushFiles needs absolute paths, got ${path}`);
     await box.sandbox.files.upload(path, content, { timeoutMs: T.exec });
   }
+}
+
+/** Copy a whole local project into the sandbox: tar it, upload one file, unpack inside. Skips node_modules, .git, .env*. */
+export async function pushDir(box: Box, localDir: string, destDir = APP_DIR): Promise<void> {
+  const tgz = path.join(tmpdir(), `darwin-${process.pid}-${Date.now()}.tgz`);
+  try {
+    execFileSync("tar", ["czf", tgz, "--exclude=node_modules", "--exclude=.git", "--exclude=.darwin", "--exclude=.env", "--exclude=.env.*", "-C", localDir, "."]);
+    await box.sandbox.files.upload("/tmp/project.tgz", new Blob([readFileSync(tgz)]), { timeoutMs: T.exec });
+  } finally {
+    rmSync(tgz, { force: true });
+  }
+  const r = await sh(box, `mkdir -p ${destDir} && tar xzf /tmp/project.tgz -C ${destDir} && rm -f /tmp/project.tgz`);
+  if (r.exitCode !== 0) throw new Error(`unpacking the project failed: ${r.stderr.slice(0, 200)}`);
 }
 
 export interface ExecResult {
