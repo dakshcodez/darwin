@@ -172,7 +172,7 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
     // 3. Drop the base (frees a slot), then bring in the red team on the same network
     await os.destroyBox(base).catch(() => undefined);
     await ev("cleanup", "base sandbox destroyed (waiting for the slot to free)");
-    await os.waitForSlots(client, 1 + forks.length); // red team needs one more slot while the forks live
+    await os.waitForSlots(client, 1, { cap: 4 }); // red team needs one slot; cap 4 keeps one spare so we never land exactly on 5/5
     const red = await os.createBox(client, { name: `${runId}-red`, networkId: net.id });
     created.push(red);
     await ev("provision", `red-team sandbox ${red.name} (${red.ip}) joined the network`);
