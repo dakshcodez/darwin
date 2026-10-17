@@ -33,6 +33,8 @@ export interface RaceOptions {
   keepWinner?: boolean;
   /** Hard limit for the whole run (default 8 minutes). On expiry the run is marked failed and our sandboxes are destroyed. */
   deadlineMs?: number;
+  /** Called as soon as the run row exists, so a caller (the CLI) can start following it. */
+  onRunId?: (runId: string) => void;
 }
 
 export interface RaceResult {
@@ -92,6 +94,7 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
   const ev = (kind: Parameters<Db["event"]>[1], m: string) => db.event(runId, kind, m);
 
   await db.createRun(runId);
+  opts.onRunId?.(runId);
   await db.setRunStatus(runId, "running");
   await ev("provision", describeStack(await stackSummary())); // shows the Stripe Projects stack in the UI feed
   const created: os.Box[] = [];

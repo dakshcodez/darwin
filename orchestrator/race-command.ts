@@ -27,6 +27,8 @@ export interface CommandRaceOptions {
   /** Write the winning files into the local project (default false: print the diff and save it under .darwin/). */
   apply?: boolean;
   deadlineMs?: number;
+  /** Called as soon as the run row exists, so a caller (the CLI) can start following it. */
+  onRunId?: (runId: string) => void;
 }
 
 export interface CommandRaceResult {
@@ -69,6 +71,7 @@ export async function runCommandRace(opts: CommandRaceOptions): Promise<CommandR
   const runId = `r${randomBytes(3).toString("hex").slice(0, 5)}`;
   const ev = (kind: Parameters<Db["event"]>[1], m: string) => db.event(runId, kind, m);
   await db.createRun(runId);
+  opts.onRunId?.(runId);
   await db.setRunStatus(runId, "running");
   const created: os.Box[] = [];
   let timedOut = false;
