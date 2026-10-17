@@ -28,7 +28,7 @@ function fixturePatch(i: number): Patch {
 async function chat(prompt: string, system: string): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY missing");
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const res = await fetch((process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1") + "/chat/completions", {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({
