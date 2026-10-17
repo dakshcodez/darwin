@@ -5,12 +5,14 @@ import { loadConfig } from "./config.js";
 import { Db } from "./db.js";
 import { makeClient, quota } from "./createos.js";
 import { runRace } from "./race.js";
+import { runCommandRace } from "./race-command.js";
+import { EXAMPLES, loadTarget } from "./target.js";
 
 /**
  * API for the UI (polled every second):
  *   GET  /api/runs/latest   -> RunState (latest run, its branches, attacks, events)
  *   GET  /api/runs/:id      -> RunState for one run
- *   POST /api/runs          -> start a run, returns { runId } once the run row exists (409 if one is already running)
+ *   POST /api/runs          -> start a run ({ n?, example?: "webhook" | "slugify" }), returns { runId } once the run row exists (409 if one is already running)
  *   POST /api/stripe/webhook -> a signed Stripe event (payment_intent.succeeded by default) starts a run
  *   GET  /api/health        -> { ok, running, quota }
  *
@@ -25,10 +27,14 @@ const app = express();
 
 let activeRun: Promise<unknown> | null = null;
 
-/** Start a race in the background and resolve with its run id once the run row exists. */
-async function startRun(n: number): Promise<string | null> {
+/** Start a race in the background and resolve with its run id once the run row exists.
+ *  `example` picks what to fix: the original webhook demo (attack suite) or a test-based example project. */
+async function startRun(n: number, example?: string): Promise<string | null> {
   const before = (await db.runState()).run?.id ?? null;
-  activeRun = runRace({ cfg, client, db, n })
+  const job = example && example !== "webhook"
+    ? runCommandRace({ cfg, client, db, target: loadTarget({ example, n }) })
+    : runRace({ cfg, client, db, n });
+  activeRun = job
     .catch((e) => console.error("run failed:", (e as Error).message))
     .finally(() => { activeRun = null; });
   for (let i = 0; i < 50; i++) {
@@ -100,7 +106,9 @@ app.get("/api/runs/:id", async (req, res) => {
 app.post("/api/runs", async (req, res) => {
   if (activeRun) return void res.status(409).json({ error: "a run is already in progress" });
   const n = Math.min(4, Math.max(2, Number(req.body?.n ?? 3)));
-  res.status(202).json({ runId: await startRun(n) });
+  const example = typeof req.body?.example === "string" ? req.body.example : undefined;
+  if (example && !(example in EXAMPLES)) return void res.status(400).json({ error: `unknown example "${example}"; available: ${Object.keys(EXAMPLES).join(", ")}` });
+  res.status(202).json({ runId: await startRun(n, example) });
 });
 
 app.use(express.static(path.join(cfg.rootDir, "ui")));
