@@ -355,7 +355,7 @@
 
     @media (min-width: 768px) {
       .cards-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
     }
 
@@ -695,7 +695,8 @@
     }
     .target-select:focus { border-color: var(--color-vf-blue); }
     .target-select:disabled { opacity: 0.55; cursor: not-allowed; }
-    .card-diff { margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--color-onyx); color: #cbd5e1; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; overflow-x: auto; max-height: 220px; }
+    .candidate-card { min-width: 0; }
+    .card-diff { max-width: 100%; margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--color-onyx); color: #cbd5e1; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; overflow-x: auto; max-height: 220px; }
     .card-diff .d-add { color: #4ade80; }
     .card-diff .d-del { color: #f87171; }
     .card-diff .d-hunk { color: #7dd3fc; }
