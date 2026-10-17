@@ -105,6 +105,16 @@ export async function startService(box: Box, opts: { cwd?: string; cmd?: string;
   return proc.process_id;
 }
 
+/** Stop every managed process in the box (a fork inherits the base's running service), then start the service again. */
+export async function restartService(box: Box, opts: Parameters<typeof startService>[1] = {}): Promise<string> {
+  const { processes } = await box.sandbox.processes.list();
+  for (const p of processes) {
+    if (p.state === "running") await box.sandbox.processes.delete(p.process_id, { graceMs: 500 }).catch(() => undefined);
+  }
+  await sh(box, "pkill -f 'node server.js' || true", 20_000); // belt and braces: free port 8080 before restarting
+  return startService(box, opts);
+}
+
 export async function stopProcess(box: Box, processId: string): Promise<void> {
   await box.sandbox.processes.delete(processId).catch(() => undefined);
 }
