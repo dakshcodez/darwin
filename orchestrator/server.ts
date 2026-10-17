@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import path from "node:path";
 import express from "express";
 import Stripe from "stripe";
@@ -16,6 +17,11 @@ import { EXAMPLES, loadTarget } from "./target.js";
  *   POST /api/stripe/webhook -> a signed Stripe event (payment_intent.succeeded by default) starts a run
  *   GET  /api/health        -> { ok, running, quota }
  *
+ * Protection (starting a race spends sandboxes and LLM quota, so it is gated):
+ *   DARWIN_ADMIN_TOKEN       required in the `x-darwin-token` header to start a race. If unset: open on a developer machine,
+ *                            refused when hosted (RENDER or NODE_ENV=production is set).
+ *   DARWIN_MIN_INTERVAL_SEC  minimum seconds between race starts (default 240 when hosted, 0 locally).
+ *   DARWIN_DRY=1             accept and rate-limit starts without creating anything (for tests).
  * Env: STRIPE_WEBHOOK_SECRET (whsec_..., from `stripe listen --print-secret`), DARWIN_TRIGGER_EVENT (default
  * payment_intent.succeeded), DARWIN_DRY=1 (log the trigger instead of starting a run; for testing without sandboxes).
  */
@@ -24,6 +30,20 @@ const db = new Db(cfg.databaseUrl);
 const client = makeClient(cfg);
 
 const app = express();
+app.disable("x-powered-by");
+
+const hosted = !!process.env.RENDER || process.env.NODE_ENV === "production";
+const adminToken = process.env.DARWIN_ADMIN_TOKEN?.trim() || undefined;
+const minIntervalMs = Number(process.env.DARWIN_MIN_INTERVAL_SEC ?? (hosted ? 240 : 0)) * 1000;
+let lastStartAt = 0;
+
+/** Constant-time check of the access token. With no token configured: open locally, closed when hosted. */
+function tokenOk(given: unknown): boolean {
+  if (!adminToken) return !hosted;
+  const a = Buffer.from(String(given ?? "")), b = Buffer.from(adminToken);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+const waitMs = () => Math.max(0, lastStartAt + minIntervalMs - Date.now());
 
 let activeRun: Promise<unknown> | null = null;
 
@@ -59,22 +79,26 @@ app.post("/api/stripe/webhook", express.raw({ type: "*/*" }), async (req, res) =
   }
   if (event.type !== triggerEvent) return void res.json({ received: true, started: false, reason: `ignoring ${event.type}` });
   if (activeRun) return void res.json({ received: true, started: false, reason: "a run is already in progress" });
+  if (waitMs() > 0) return void res.json({ received: true, started: false, reason: `rate limited, next race in ${Math.ceil(waitMs() / 1000)}s` });
   if (process.env.DARWIN_DRY === "1") {
     console.log(`[dry] would start a run for Stripe event ${event.id} (${event.type})`);
     return void res.json({ received: true, started: false, reason: "dry run", eventId: event.id });
   }
   console.log(`Stripe event ${event.id} (${event.type}) is starting a run`);
+  lastStartAt = Date.now();
   const runId = await startRun(3);
   res.json({ received: true, started: true, runId, eventId: event.id });
 });
 
 app.use(express.json());
 
-// The UI runs on another origin in dev (Vite). Open CORS is fine: the API holds no secrets and only starts demo runs.
+// Local development: the UI may run on another origin (Vite). Hosted: same origin only, so no CORS headers at all.
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "content-type");
+  if (!hosted) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "content-type,x-darwin-token");
+  }
   if (req.method === "OPTIONS") return void res.sendStatus(204);
   next();
 });
@@ -104,10 +128,20 @@ app.get("/api/runs/:id", async (req, res) => {
 });
 
 app.post("/api/runs", async (req, res) => {
+  if (!tokenOk(req.headers["x-darwin-token"])) {
+    return void res.status(adminToken ? 401 : 503).json({ error: adminToken ? "a valid access token is required to start a race" : "starting races is disabled on this server: DARWIN_ADMIN_TOKEN is not set" });
+  }
   if (activeRun) return void res.status(409).json({ error: "a run is already in progress" });
   const n = Math.min(4, Math.max(2, Number(req.body?.n ?? 3)));
   const example = typeof req.body?.example === "string" ? req.body.example : undefined;
   if (example && !(example in EXAMPLES)) return void res.status(400).json({ error: `unknown example "${example}"; available: ${Object.keys(EXAMPLES).join(", ")}` });
+  const wait = waitMs();
+  if (wait > 0) {
+    res.setHeader("Retry-After", String(Math.ceil(wait / 1000)));
+    return void res.status(429).json({ error: `rate limited: the next race can start in ${Math.ceil(wait / 1000)}s`, retryAfterSec: Math.ceil(wait / 1000) });
+  }
+  lastStartAt = Date.now();
+  if (process.env.DARWIN_DRY === "1") return void res.status(202).json({ runId: null, dry: true });
   res.status(202).json({ runId: await startRun(n, example) });
 });
 
