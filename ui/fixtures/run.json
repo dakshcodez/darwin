@@ -1,0 +1,37 @@
+{
+  "run": { "id": "run-demo", "status": "done", "created_at": "2026-10-17T20:10:00Z", "winner_branch_id": "br-b" },
+  "branches": [
+    { "id": "br-base", "run_id": "run-demo", "parent_id": null, "sandbox_id": "sb-base", "sandbox_name": "dw-demo-base", "sandbox_ip": "10.0.60.10", "status": "promoted", "patch_rationale": null, "score": null, "reason": null, "created_at": "2026-10-17T20:10:00Z" },
+    { "id": "br-a", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-a", "sandbox_name": "dw-demo-a", "sandbox_ip": "10.0.60.11", "status": "killed", "patch_rationale": "Skip ids already in a seen-set, recorded after the work.", "score": 17, "reason": "Failed 5/6: concurrent-duplicates, malformed-payloads. same event id delivered 20x in parallel -> 20 ledger entries (want 1)", "created_at": "2026-10-17T20:10:20Z" },
+    { "id": "br-b", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-b", "sandbox_name": "dw-demo-b", "sandbox_ip": "10.0.60.12", "status": "promoted", "patch_rationale": "Claim the event id in an in-flight set before the await, and validate the body with 4xx errors.", "score": 100, "reason": "Survived all 6 attacks.", "created_at": "2026-10-17T20:10:20Z" },
+    { "id": "br-c", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-c", "sandbox_name": "dw-demo-c", "sandbox_ip": "10.0.60.13", "status": "killed", "patch_rationale": "Validate input and wrap parsing in try/catch; check a Map after the work.", "score": 67, "reason": "Failed 2/6: concurrent-duplicates, replay-old-event. same event id delivered 20x in parallel -> 7 ledger entries (want 1)", "created_at": "2026-10-17T20:10:20Z" }
+  ],
+  "attacks": [
+    { "id": 1, "branch_id": "br-a", "name": "sequential-duplicates", "passed": true, "detail": "5x -> 1 entry" },
+    { "id": 2, "branch_id": "br-a", "name": "concurrent-duplicates", "passed": false, "detail": "20x in parallel -> 20 entries (want 1)" },
+    { "id": 3, "branch_id": "br-a", "name": "malformed-payloads", "passed": false, "detail": "expected 4xx, got -1" },
+    { "id": 4, "branch_id": "br-a", "name": "valid-after-malformed", "passed": false, "detail": "status -1" },
+    { "id": 5, "branch_id": "br-a", "name": "replay-old-event", "passed": false, "detail": "fetch failed" },
+    { "id": 6, "branch_id": "br-a", "name": "health-alive", "passed": false, "detail": "service is down" },
+    { "id": 7, "branch_id": "br-b", "name": "sequential-duplicates", "passed": true, "detail": "5x -> 1 entry" },
+    { "id": 8, "branch_id": "br-b", "name": "concurrent-duplicates", "passed": true, "detail": "20x -> 1 entry" },
+    { "id": 9, "branch_id": "br-b", "name": "malformed-payloads", "passed": true, "detail": "all 7 rejected with 4xx" },
+    { "id": 10, "branch_id": "br-b", "name": "valid-after-malformed", "passed": true, "detail": "200 / 1" },
+    { "id": 11, "branch_id": "br-b", "name": "replay-old-event", "passed": true, "detail": "1 entry" },
+    { "id": 12, "branch_id": "br-b", "name": "health-alive", "passed": true, "detail": "ok" },
+    { "id": 13, "branch_id": "br-c", "name": "sequential-duplicates", "passed": true, "detail": "5x -> 1 entry" },
+    { "id": 14, "branch_id": "br-c", "name": "concurrent-duplicates", "passed": false, "detail": "20x -> 7 entries (want 1)" },
+    { "id": 15, "branch_id": "br-c", "name": "malformed-payloads", "passed": true, "detail": "all 7 rejected with 4xx" },
+    { "id": 16, "branch_id": "br-c", "name": "valid-after-malformed", "passed": true, "detail": "200 / 1" },
+    { "id": 17, "branch_id": "br-c", "name": "replay-old-event", "passed": false, "detail": "2 entries" },
+    { "id": 18, "branch_id": "br-c", "name": "health-alive", "passed": true, "detail": "ok" }
+  ],
+  "events": [
+    { "id": 1, "run_id": "run-demo", "at": "2026-10-17T20:10:00Z", "kind": "provision", "message": "Base sandbox created and buggy service started on :8080" },
+    { "id": 2, "run_id": "run-demo", "at": "2026-10-17T20:10:08Z", "kind": "fork", "message": "Base paused; forking into 3 branches (RAM and processes copied)" },
+    { "id": 3, "run_id": "run-demo", "at": "2026-10-17T20:10:20Z", "kind": "patch", "message": "Builder agent wrote 3 different fixes" },
+    { "id": 4, "run_id": "run-demo", "at": "2026-10-17T20:10:30Z", "kind": "attack", "message": "Red team attacking 3 forks over the private network" },
+    { "id": 5, "run_id": "run-demo", "at": "2026-10-17T20:10:45Z", "kind": "verdict", "message": "patch-a killed (17), patch-c killed (67), patch-b survived (100)" },
+    { "id": 6, "run_id": "run-demo", "at": "2026-10-17T20:10:48Z", "kind": "cleanup", "message": "Losers deleted; patch-b promoted" }
+  ]
+}
