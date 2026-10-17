@@ -8,6 +8,7 @@ import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import * as os from "./createos.js";
 import { stubAgents } from "./stubs.js";
+import { describeStack, stackSummary } from "./stripe-projects.js";
 
 /**
  * One Darwin run:
@@ -90,6 +91,7 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
 
   await db.createRun(runId);
   await db.setRunStatus(runId, "running");
+  await ev("provision", describeStack(await stackSummary())); // shows the Stripe Projects stack in the UI feed
   const created: os.Box[] = [];
   let netId: string | undefined;
   let winner: string | null = null;
