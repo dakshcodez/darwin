@@ -36,7 +36,10 @@ const T = {
 };
 
 export function makeClient(cfg: Config): CreateosSandboxClient {
-  return createClient({ apiKey: cfg.sandboxApiKey, baseUrl: cfg.sandboxBaseUrl });
+  // Passing our own fetch makes the SDK skip its custom HTTP/2 transport. That transport has a bug: when a response
+  // stream ends without a status it builds `new Response(.., {status: 0})`, which throws inside an event handler and
+  // kills the whole process (seen while destroying sandboxes). Plain Node fetch has no such failure mode.
+  return createClient({ apiKey: cfg.sandboxApiKey, baseUrl: cfg.sandboxBaseUrl, fetch: (url, init) => fetch(url, init) });
 }
 
 async function toBox(sandbox: Sandbox): Promise<Box> {
