@@ -91,15 +91,12 @@ On Beginner we get **5 concurrent sandboxes (paused ones count)** and **50 sandb
 - **Limits:** env vars 64 keys / 4 KiB per value; 50 GiB bandwidth per sandbox; exec output 1 MiB.
 - **Billing:** per second of vCPU/RAM/disk; paused sandboxes stop compute charges but still bill memory and storage.
 
-### 3.2.0 THE EU ENDPOINT IS REQUIRED (organizer instruction on Discord, Oct 17; they confirmed it is necessary, not optional)
+### 3.2.0 Sandbox endpoint: we use the DEFAULT, not EU (decision made on the day)
 
-Everyone must use **`https://api-eu.sb.createos.sh`** for the sandbox API (the default is `https://api.sb.createos.sh`). **Never use the default host for anything the project does**, including the pre-warm script, the cleanup script and manual CLI use. Export the env var in every shell before running anything. Both hosts are live and answer `/healthz`; the EU one accepted our account's login (read-only `list`, `shapes`, `rootfs`, `network list` all worked).
-- **CLI:** `export CREATEOS_SANDBOX_URL=https://api-eu.sb.createos.sh` (or the flag `--sandbox-api-url`).
-- **SDK:** `CREATEOS_SANDBOX_BASE_URL=https://api-eu.sb.createos.sh` or `createClient({ baseUrl: "https://api-eu.sb.createos.sh" })`. The SDK's env names differ from the CLI's.
-- **REST:** base `https://api-eu.sb.createos.sh/v1/...`, header `X-Api-Key`.
-- Put the URL in the orchestrator's config loader (one place), and in `.env` so both teammates use it. Sandboxes created on one endpoint may not appear on the other, so **never mix endpoints** inside one run.
-- **EU re-test done (pre-kickoff):** behavior is identical to the default endpoint (RAM and process state copied into forks, forks not on the network until `attach`, name DNS still fails, egress allowlist needs the red-team IP, same 5-cap), **but latency is worse**: pause about 9.8 s, fork about 12-16 s each (default endpoint: pause about 5.5 s, fork about 5.4 s), create/attach unchanged (about 0.7 s / 0.8 s). The EU run overlapped a large plugin download on the same machine and a single run is a small sample, so re-measure on the day. **Plan for about 15 s per fork**: fork in parallel, and show the forking progress in the UI so the wait looks intentional.
-- The behavior and timing table in 3.2a below was first measured on the **default** endpoint.
+The organizers asked everyone on Discord to use **`https://api-eu.sb.createos.sh`** (and said it was necessary). After many live races we moved the project to the **default `https://api.sb.createos.sh`** because the EU host stalled often on pause, fork and resume (about 1 in 3 operations ran past 75 s; one hung 10 minutes). **This goes against the organizers' instruction; if they object or eligibility depends on it, switch back by setting both variables below to the EU URL (nothing else changes).** Never mix endpoints inside one run: sandboxes created on one host may not appear on the other.
+- **CLI:** `CREATEOS_SANDBOX_URL=https://api.sb.createos.sh` (flag `--sandbox-api-url`). **SDK:** `CREATEOS_SANDBOX_BASE_URL=...` or `createClient({ baseUrl })`. **REST:** `<base>/v1/...` with header `X-Api-Key`.
+- The orchestrator reads `CREATEOS_SANDBOX_BASE_URL` / `CREATEOS_SANDBOX_URL` from `.env` (default: the standard host). Stripe Projects holds them as project variables (`createos-sandbox-url`, `createos-sandbox-base-url`); `stripe projects env --pull` rewrites `.env`, but **do not run it blindly**: it also resets `OPENROUTER_API_KEY` to the OpenRouter key, overwriting the Gemini key we put there.
+- Measured on each host (one sample each, so indicative only): default endpoint pause about 5.5 s and fork about 5.4 s; EU pause 8-15 s and fork 10-16 s with frequent stalls. Behavior (network attach, egress, RAM copy) was identical.
 
 ### 3.2a LIVE-TESTED behavior (pre-kickoff, CLI v0.0.31, `devbox:1`, `s-1vcpu-1gb`). These override the docs where they differ
 
@@ -358,7 +355,7 @@ Times are targets. **Milestone M1 = 1:45 PM** (infra and service independently w
 1. Create the repo and push the layout from section 4. Write `/contracts/types.ts` and `/contracts/schema.sql`; tell B.
 2. `stripe projects init <name>`, `stripe projects add createos/project`, `stripe projects catalog`, then add Neon and OpenRouter. Run `stripe projects env --pull`. Share the needed keys with B securely (Discord DM, never commit `.env`; add it to `.gitignore` first).
 3. Apply `schema.sql` to Neon.
-3a. **Point everything at the EU sandbox endpoint (required, see 3.2.0).** Both teammates do this once, before touching CreateOS:
+3a. **Sandbox endpoint (we use the default host, see 3.2.0; the EU values below are the organizers' request and are no longer used).** Both teammates do this once, before touching CreateOS:
    - Shell (permanent): `echo 'export CREATEOS_SANDBOX_URL=https://api-eu.sb.createos.sh' >> ~/.bashrc && echo 'export CREATEOS_SANDBOX_BASE_URL=https://api-eu.sb.createos.sh' >> ~/.bashrc && source ~/.bashrc`. The CLI reads `CREATEOS_SANDBOX_URL`; the SDK reads `CREATEOS_SANDBOX_BASE_URL`. Verify with `echo $CREATEOS_SANDBOX_URL` and `createos sandbox list`.
    - Project config: after `init`, store both as Stripe Projects variables so `env --pull` writes them to `.env` for everyone: `stripe projects variables set createos-sandbox-url --env-key CREATEOS_SANDBOX_URL --value https://api-eu.sb.createos.sh` and the same with `createos-sandbox-base-url` / `CREATEOS_SANDBOX_BASE_URL`.
    - Commit a `.env.example` with these variable names and the EU URL (not secret); `.env` itself stays gitignored. Nothing loads `.env` into the CLI automatically; our orchestrator loads it (dotenv or `node --env-file=.env`) and also passes `baseUrl` to `createClient` explicitly.
@@ -463,7 +460,7 @@ Demo script, the video (someone on camera), the post, README sections on the ser
 - [ ] `npm install -g @stripe/cli`, then `stripe plugin install projects`
 - [ ] Install the CreateOS CLI: `curl -sfL https://raw.githubusercontent.com/NodeOps-app/createos-cli/main/install.sh | sh -`
 - [ ] Throwaway test in a scratch directory (not the project repo): `createos sandbox create --shape s-1vcpu-1gb --name test-1` and `createos sandbox exec test-1 -- python3 -c 'print("hello")'`, then delete it
-- [ ] Set the EU sandbox endpoint in your shell (permanent): `echo 'export CREATEOS_SANDBOX_URL=https://api-eu.sb.createos.sh' >> ~/.bashrc`, also `CREATEOS_SANDBOX_BASE_URL` for the SDK, then `source ~/.bashrc` (required by the organizers)
+- [ ] (Superseded by 3.2.0: we use the default endpoint; skip this.) Set the EU sandbox endpoint in your shell: `echo 'export CREATEOS_SANDBOX_URL=https://api-eu.sb.createos.sh' >> ~/.bashrc`, also `CREATEOS_SANDBOX_BASE_URL` for the SDK, then `source ~/.bashrc` (required by the organizers)
 - [ ] Both joined the Discord
 - [ ] Both have free Stripe accounts and a YouTube account for the video
 - [ ] Check the Beginner plan situation (item 1 in section 9)
