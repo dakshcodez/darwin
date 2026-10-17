@@ -96,14 +96,15 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
   let verdicts: Verdict[] = [];
 
   try {
-    // Make room: a leftover sandbox from an earlier run would eat the concurrency cap.
+    // Make room: leftovers from an earlier run would eat the concurrency cap, and destroyed sandboxes keep
+    // counting for a while, so wait until the slots we need are really free (n forks + base at the peak).
     const q0 = await os.quota(client);
-    if (q0.live > 0) {
-      await ev("cleanup", `${q0.live} sandbox(es) already live; removing leftovers first`);
+    if (q0.running + q0.paused > 0) {
+      await ev("cleanup", `${q0.running + q0.paused} sandbox(es) already live; removing leftovers first`);
       await os.destroyAllOurs(client);
     }
-    const q = await os.quota(client);
-    if (q.live + n + 1 > 5) throw new Error(`not enough sandbox slots: ${q.live} live, need ${n + 1} (cap 5, other sandboxes are in the way)`);
+    const q = await os.waitForSlots(client, n + 1);
+    await ev("info", `slots free: ${5 - q.live} of 5 (need ${n + 1})`);
 
     const files = await readServiceFiles(serviceDir);
     await ev("info", `service source: ${path.relative(cfg.rootDir, serviceDir)} (${Object.keys(files).length} files), ${n} candidates`);
@@ -147,7 +148,8 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
 
     // 3. Drop the base (frees a slot), then bring in the red team on the same network
     await os.destroyBox(base).catch(() => undefined);
-    await ev("cleanup", "base sandbox destroyed (slot freed)");
+    await ev("cleanup", "base sandbox destroyed (waiting for the slot to free)");
+    await os.waitForSlots(client, 1 + forks.length); // red team needs one more slot while the forks live
     const red = await os.createBox(client, { name: `${runId}-red`, networkId: net.id });
     created.push(red);
     await ev("provision", `red-team sandbox ${red.name} (${red.ip}) joined the network`);
