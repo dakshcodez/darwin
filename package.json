@@ -14,7 +14,8 @@
     "dev": "tsx orchestrator/server.ts",
     "race": "tsx orchestrator/run-once.ts",
     "cleanup": "tsx infra/cleanup.ts",
-    "smoke": "tsx infra/smoke.ts"
+    "smoke": "tsx infra/smoke.ts",
+    "check:agents": "tsx infra/check-agents.ts"
   },
   "dependencies": {
     "@nodeops-createos/sandbox": "^0.8.2",
