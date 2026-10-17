@@ -9,6 +9,7 @@ import type { Db } from "./db.js";
 import * as os from "./createos.js";
 import { stubAgents } from "./stubs.js";
 import { describeStack, stackSummary } from "./stripe-projects.js";
+import { unifiedDiff } from "./race-command.js";
 
 /**
  * One Darwin run:
@@ -220,6 +221,7 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
       await db.upsertBranch({
         id: b.id, runId, parentId: baseId, sandboxId: b.box.id, sandboxName: b.box.name, sandboxIp: b.box.ip,
         status: "patching", patchRationale: b.patch?.rationale ?? null,
+        patchDiff: b.patch && Object.keys(b.patch.files).length ? unifiedDiff(serviceDir, b.patch.files).slice(0, 8000) : null,
       });
     }
 

@@ -110,6 +110,7 @@ export interface BranchRow {
   sandbox_ip: string | null;
   status: BranchStatus;
   patch_rationale: string | null;
+  patch_diff: string | null; // unified diff of the candidate's patch (capped), shown by the UI
   score: number | null;
   reason: string | null;
   created_at: string;
