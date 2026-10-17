@@ -183,6 +183,8 @@ await sb.destroy(); await sb.waitUntilDestroyed();
 
 **Setup:** Stripe CLI v1.40+ (`npm install -g @stripe/cli`), `stripe login`, `stripe plugin install projects` (`stripe plugin upgrade projects` to update).
 
+**Gotchas hit on day (plugin v0.50.0):** `--auto-confirm` is rejected ("Unknown arguments"), so use `--accept-tos --yes --no-interactive --json`. Each provider needs its **plan first**: `stripe projects add createos/free`, then `createos/project`; `neon/free`, then `neon/postgres`. (`openrouter/api` needed no plan step.) `init` did not require a browser pairing once `stripe login` was done. `init`/`add` print a `<claude-code-hint .../>` line before the JSON, so strip it before parsing. `init` rewrites `.gitignore` and appends a line to `CLAUDE.md`; both were left as is.
+
 **Commands** (global flags: `--json --no-interactive --auto-confirm --accept-tos --quiet --debug`):
 | Command | Use |
 |---|---|
@@ -337,7 +339,8 @@ Times are targets. **Milestone M1 = 1:45 PM** (infra and service independently w
    - Shell (permanent): `echo 'export CREATEOS_SANDBOX_URL=https://api-eu.sb.createos.sh' >> ~/.bashrc && echo 'export CREATEOS_SANDBOX_BASE_URL=https://api-eu.sb.createos.sh' >> ~/.bashrc && source ~/.bashrc`. The CLI reads `CREATEOS_SANDBOX_URL`; the SDK reads `CREATEOS_SANDBOX_BASE_URL`. Verify with `echo $CREATEOS_SANDBOX_URL` and `createos sandbox list`.
    - Project config: after `init`, store both as Stripe Projects variables so `env --pull` writes them to `.env` for everyone: `stripe projects variables set createos-sandbox-url --env-key CREATEOS_SANDBOX_URL --value https://api-eu.sb.createos.sh` and the same with `createos-sandbox-base-url` / `CREATEOS_SANDBOX_BASE_URL`.
    - Commit a `.env.example` with these variable names and the EU URL (not secret); `.env` itself stays gitignored. Nothing loads `.env` into the CLI automatically; our orchestrator loads it (dotenv or `node --env-file=.env`) and also passes `baseUrl` to `createClient` explicitly.
-   - After `stripe projects add createos/project`, check which API-key variable names it wrote (SDK wants `CREATEOS_SANDBOX_API_KEY`, CLI wants `CREATEOS_API_KEY`) and map them in the config loader.
+   - **Done (provisioned on day):** `stripe projects add createos/project` wrote `CREATEOS_PLAN_API_KEY/URL/CREDENTIALS/DASHBOARD_URL` and `CREATEOS_PROJECT_API_KEY/URL/CREDENTIALS/DASHBOARD_URL`. The CLI accepts these names natively, but the SDK wants `CREATEOS_SANDBOX_API_KEY`, which is **not** written, so `config.ts` maps `CREATEOS_PROJECT_API_KEY` to it. Verified: both keys authenticate against `https://api-eu.sb.createos.sh/v1/whoami` and map to the same account (and its 5-sandbox cap) we tested with. `*_API_URL` is the general CreateOS API (`api-createos.nodeops.network`), not the sandbox API.
+- **Neon** wrote `NEON_POSTGRES_CONNECTION_STRING` (+ `_PROJECT_ID`, `_BRANCH_ID`, `_BRANCH_NAME`, `_DATABASE_NAME`, `_ORG_ID`, `NEON_PLAN_ORG_ID`). **OpenRouter** wrote `OPENROUTER_API_KEY` (+ `OPENROUTER_TYPE`).
 4. **Resolved pre-kickoff:** the CreateOS account we tested with has a 5-concurrent cap and fork works (verified, section 3.2a). Use this account for the CreateOS side. Historical note: a fresh (Free) account failed with `sandbox concurrent quota reached (1 / 1)`; paused sandboxes count and `fork --paused` is blocked too. Per https://createos.sh/docs/Sandbox/Limits: **Free = 1 concurrent / 10 per day, Beginner = 5 concurrent / 50 per day, Pro = 20 / 200**. We need Beginner (about $10/month per a marketplace listing, or a promo from the organizers; we asked in Discord). Confirm the plan is active and rerun the fork test. A quota of 1 cannot run this project, even with the "create N sandboxes" fallback.
 
 **A2. Sandbox primitives (1:00-1:45)**
