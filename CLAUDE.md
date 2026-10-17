@@ -439,3 +439,7 @@ Demo script, the video (someone on camera), the post, README sections on the ser
 - [ ] Both joined the Discord
 - [ ] Both have free Stripe accounts and a YouTube account for the video
 - [ ] Check the Beginner plan situation (item 1 in section 9)
+
+<!-- stripe-projects-cli managed:claude-md:start -->
+look at AGENTS.md for your rules
+<!-- stripe-projects-cli managed:claude-md:end -->
