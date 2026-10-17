@@ -456,10 +456,11 @@
     }
 
     .spec-value {
-      font-size: 16px;
+      font-size: 14.5px;
       font-weight: 600;
       letter-spacing: -0.02em;
       color: #ffffff;
+      white-space: nowrap;
     }
 
     /* WHITE SECTION: HOW DARWIN WORKS */
@@ -770,9 +771,9 @@
 <span class="t-comment"># 2. Run Darwin autonomous race harness</span>
 <span class="t-prompt">$ </span><span class="t-cmd">npm run race -- --forks 3</span>
 <span class="t-dim">[orchestrator] Base snapshot paused (dw-base:8080)</span>
-<span class="t-dim">[orchestrator] Cloned 3 byte-identical micro-VMs in 42ms</span>
+<span class="t-dim">[orchestrator] Forked 3 micro-VMs in parallel (RAM &amp; processes copied)</span>
 <span class="t-dim">[builder] 3 candidate patches synthesized via OpenRouter</span>
-<span class="t-dim">[redteam] Dispatched 6 stress vectors over 10.0.60.0/24</span>
+<span class="t-dim">[redteam] Dispatched 6 stress vectors across private peer network</span>
 <span class="t-pass">✔ Fix B survived all attacks. Promoted to production!</span>
 <span class="t-prompt">$ </span><span class="t-caret">▍</span></code></pre>
 
@@ -794,27 +795,27 @@
       <dl class="specs-strip">
         <div class="spec-cell">
           <dt class="spec-label">Isolation Layer</dt>
-          <dd class="spec-value">Firecracker KVM</dd>
+          <dd class="spec-value">CreateOS Firecracker</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Private Subnet</dt>
-          <dd class="spec-value">10.0.60.0/24</dd>
+          <dt class="spec-label">Private Network</dt>
+          <dd class="spec-value">CreateOS Peer Net</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Snapshot Clone</dt>
-          <dd class="spec-value">42ms Instant Fork</dd>
+          <dt class="spec-label">Snapshot Fork</dt>
+          <dd class="spec-value">RAM &amp; Process State</dd>
         </div>
         <div class="spec-cell">
           <dt class="spec-label">Stress Suite</dt>
-          <dd class="spec-value">6 Automated Vectors</dd>
+          <dd class="spec-value">6 Concurrency Vectors</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Containment SLA</dt>
-          <dd class="spec-value">100% Zero-Egress</dd>
+          <dt class="spec-label">Egress Firewall</dt>
+          <dd class="spec-value">Zero Internet Egress</dd>
         </div>
         <div class="spec-cell">
           <dt class="spec-label">Survivorship</dt>
-          <dd class="spec-value">Deterministic Promotion</dd>
+          <dd class="spec-value">Single Verified Winner</dd>
         </div>
       </dl>
     </div>
@@ -847,7 +848,7 @@
           <span class="step-num">02 / PARALLEL FORK</span>
           <h3 class="step-title">Parallel Clones</h3>
           <p class="step-desc">
-            From the paused snapshot, Darwin clones 3 independent micro-VMs in parallel (~40ms each). Each fork runs its service with RAM and process state already warm.
+            From the paused snapshot, Darwin forks 3 independent micro-VMs in parallel. Each clone inherits the full in-memory process tree and warm runtime state with zero cold-boot penalty.
           </p>
         </div>
 
@@ -855,7 +856,7 @@
           <span class="step-num">03 / RED-TEAM</span>
           <h3 class="step-title">Adversarial Assault</h3>
           <p class="step-desc">
-            An isolated red-team attacker VM launches concurrent duplicate bursts, malformed payloads, and replay attacks across private subnet <code>10.0.60.0/24</code>.
+            An isolated red-team attacker VM launches concurrent duplicate bursts, malformed payloads, and replay attacks across an isolated CreateOS private network.
           </p>
         </div>
 

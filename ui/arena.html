@@ -857,10 +857,10 @@
         { "id": 18, "branch_id": "br-c", "name": "health-alive", "passed": true, "detail": "healthy" }
       ],
       "events": [
-        { "id": 1, "run_id": "run-demo", "at": "2026-10-17T20:10:00Z", "kind": "provision", "message": "Base micro-VM initialized with webhook fulfillment service on 10.0.60.10:8080" },
-        { "id": 2, "run_id": "run-demo", "at": "2026-10-17T20:10:08Z", "kind": "fork", "message": "Base state paused; forked 3 byte-identical micro-VMs in parallel (RAM & processes copied in 42ms)" },
+        { "id": 1, "run_id": "run-demo", "at": "2026-10-17T20:10:00Z", "kind": "provision", "message": "Base micro-VM initialized with webhook fulfillment service on port 8080" },
+        { "id": 2, "run_id": "run-demo", "at": "2026-10-17T20:10:08Z", "kind": "fork", "message": "Base state paused; forked 3 byte-identical micro-VMs in parallel (RAM & processes copied into memory)" },
         { "id": 3, "run_id": "run-demo", "at": "2026-10-17T20:10:20Z", "kind": "patch", "message": "Builder agent generated 3 candidate algorithmic fixes via OpenRouter" },
-        { "id": 4, "run_id": "run-demo", "at": "2026-10-17T20:10:30Z", "kind": "attack", "message": "Adversarial red-team launching 6 stress vectors over private subnet (10.0.60.0/24)" },
+        { "id": 4, "run_id": "run-demo", "at": "2026-10-17T20:10:30Z", "kind": "attack", "message": "Adversarial red-team launching 6 stress vectors across CreateOS private network" },
         { "id": 5, "run_id": "run-demo", "at": "2026-10-17T20:10:45Z", "kind": "verdict", "message": "Candidate A killed (score 17), Candidate C killed (score 67), Candidate B survived (score 100)" },
         { "id": 6, "run_id": "run-demo", "at": "2026-10-17T20:10:48Z", "kind": "cleanup", "message": "Eliminated micro-VMs destroyed; Candidate B promoted to live production route" }
       ]
