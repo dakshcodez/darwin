@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Darwin: fork, attack, promote</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --amber: #d29922; --red: #f85149; --green: #3fb950; --blue: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 20px; letter-spacing: .5px; }
+  h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .spacer { flex: 1; }
+  .pill { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  .pill.live { color: var(--green); border-color: var(--green); }
+  .pill.off { color: var(--red); border-color: var(--red); }
+  button { background: var(--green); color: #04130a; border: 0; padding: 8px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .base { margin: 0 auto; width: 280px; text-align: center; border: 1px solid var(--blue); border-radius: 10px; padding: 12px; background: var(--panel); }
+  .base b { color: var(--blue); }
+  .base .sub { color: var(--muted); font-size: 12px; }
+  .stem { width: 2px; height: 24px; background: var(--line); margin: 0 auto; }
+  .bar { height: 2px; background: var(--line); margin: 0 auto; width: 66%; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 0; }
+  .tile { position: relative; background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 14px; transition: border-color .4s, box-shadow .4s, opacity .6s, filter .6s; animation: pop .5s ease-out; overflow: hidden; }
+  .tile::before { content: ""; position: absolute; left: 50%; top: -18px; width: 2px; height: 18px; background: var(--line); }
+  @keyframes pop { from { transform: translateY(-14px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+  .tile.forking, .tile.patching { border-color: var(--blue); }
+  .tile.attacking { border-color: var(--amber); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(210,153,34,.45); } 50% { box-shadow: 0 0 14px 2px rgba(210,153,34,.45); } }
+  .tile.killed { border-color: var(--red); opacity: .6; filter: grayscale(.6); animation: pop .5s, shake .5s .0s; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+  .tile.killed .title::after { content: " \2715"; color: var(--red); }
+  .tile.survivor { border-color: var(--green); }
+  .tile.promoted { border-color: var(--green); box-shadow: 0 0 22px 2px rgba(63,185,80,.5); }
+  .tile.error { border-color: var(--red); border-style: dashed; }
+  .title { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
+  .badge { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; padding: 2px 8px; border-radius: 4px; background: var(--line); color: var(--text); }
+  .forking .badge, .patching .badge { background: var(--blue); color: #021; }
+  .attacking .badge { background: var(--amber); color: #210; }
+  .killed .badge, .error .badge { background: var(--red); color: #200; }
+  .survivor .badge, .promoted .badge { background: var(--green); color: #021; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .why { margin: 10px 0; min-height: 40px; }
+  .checks { list-style: none; padding: 0; margin: 0 0 8px; }
+  .checks li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; padding: 1px 0; }
+  .ok { color: var(--green); } .no { color: var(--red); } .wait { color: var(--muted); }
+  .score { font-size: 28px; font-weight: 700; }
+  .reason { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-word; }
+  .crown { display: none; position: absolute; top: 8px; right: 12px; font-size: 11px; background: var(--green); color: #021; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+  .promoted .crown { display: block; }
+  .promoted .badge { visibility: hidden; }
+  .banner { margin: 20px auto 0; padding: 12px 18px; border-radius: 8px; background: rgba(63,185,80,.12); border: 1px solid var(--green); color: var(--green); text-align: center; font-weight: 600; animation: pop .6s; }
+  .empty { text-align: center; color: var(--muted); padding: 60px 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 28px 0 8px; }
+  .feed { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-height: 260px; overflow-y: auto; padding: 8px 12px; font: 12.5px/1.6 ui-monospace, Consolas, monospace; }
+  .feed div { white-space: pre-wrap; }
+  .k { display: inline-block; min-width: 68px; text-transform: uppercase; font-size: 11px; }
+  .k-provision { color: var(--blue); } .k-fork { color: #a371f7; } .k-patch { color: var(--blue); } .k-attack { color: var(--amber); }
+  .k-verdict { color: var(--green); } .k-cleanup { color: var(--muted); } .k-error { color: var(--red); } .k-info { color: var(--muted); }
+  .t { color: var(--muted); margin-right: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Darwin <small>fork, attack, promote. Safe by construction.</small></h1>
+  <span class="spacer"></span>
+  <span id="conn" class="pill">connecting</span>
+  <span id="runpill" class="pill">no run</span>
+  <button id="start">Start run</button>
+</header>
+<main>
+  <div id="board"></div>
+  <h2>Events</h2>
+  <div class="feed" id="feed"></div>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const API = params.get("api") || "http://localhost:8787";
+const FIXTURE = params.has("fixture");
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const CHECKS = ["sequential-duplicates", "concurrent-duplicates", "malformed-payloads", "valid-after-malformed", "replay-old-event", "health-alive"];
+const LABEL = { forking: "forking", patching: "patching", attacking: "attacking", killed: "killed", survivor: "survivor", promoted: "promoted", error: "error" };
+
+let lastKey = "";
+let stickFeed = true;
+
+function render(state) {
+  const { run, branches = [], attacks = [], events = [] } = state;
+  $("runpill").textContent = run ? `run ${String(run.id).slice(0, 8)} · ${run.status}` : "no run";
+  const running = run && (run.status === "running" || run.status === "pending");
+  $("start").disabled = !!running && !FIXTURE;
+  $("start").textContent = running ? "Running..." : "Start run";
+
+  const base = branches.find((b) => !b.parent_id);
+  const kids = branches.filter((b) => b.parent_id).sort((a, b) => String(a.sandbox_name).localeCompare(String(b.sandbox_name)));
+  const winner = branches.find((b) => b.status === "promoted" && b.parent_id) || branches.find((b) => run && b.id === run.winner_branch_id);
+
+  const tile = (b, i) => {
+    const mine = attacks.filter((a) => a.branch_id === b.id);
+    const names = CHECKS.concat(mine.map((a) => a.name).filter((n) => !CHECKS.includes(n)));
+    const rows = names.map((n) => {
+      const a = mine.find((x) => x.name === n);
+      const icon = !a ? '<span class="wait">·</span>' : a.passed ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+      return `<li>${icon}<span title="${esc(a?.detail)}">${esc(n)}</span></li>`;
+    }).join("");
+    const label = `Fix ${String.fromCharCode(65 + i)}`;
+    return `<div class="tile ${esc(b.status)}" data-id="${esc(b.id)}">
+      <span class="crown">PROMOTED</span>
+      <div class="title"><span>${label}</span><span class="badge">${esc(LABEL[b.status] || b.status)}</span></div>
+      <div class="meta">${esc(b.sandbox_name || "")} ${b.sandbox_ip ? "· " + esc(b.sandbox_ip) : ""}</div>
+      <div class="why">${esc(b.patch_rationale || (b.status === "forking" ? "Forking the paused base: RAM and processes copied..." : "Waiting for the builder agent..."))}</div>
+      <ul class="checks">${rows}</ul>
+      <div class="score">${b.score == null ? "" : esc(b.score)}<span class="meta">${b.score == null ? "" : " / 100"}</span></div>
+      <div class="reason">${esc(b.reason || "")}</div>
+    </div>`;
+  };
+
+  let html;
+  if (!branches.length) {
+    html = `<div class="empty">No run yet. Press <b>Start run</b> to fork the base sandbox and let the fixes race.</div>`;
+  } else {
+    html = `<div class="base"><b>BASE SANDBOX</b><div class="sub">buggy webhook service, paused snapshot${base?.sandbox_ip ? " · " + esc(base.sandbox_ip) : ""}</div></div>
+      <div class="stem"></div><div class="bar"></div>
+      <div class="tiles">${kids.map(tile).join("")}</div>`;
+    if (winner && run && run.status === "done") {
+      html += `<div class="banner">Survivor promoted: ${esc(winner.sandbox_name || winner.id)} passed every attack. ${kids.length - 1} other fork(s) deleted. None of the agent-written code touched a real machine.</div>`;
+    } else if (run && run.status === "done") {
+      html += `<div class="banner" style="color:var(--red);border-color:var(--red);background:rgba(248,81,73,.1)">No fork survived the red team. Nothing was promoted.</div>`;
+    }
+  }
+  // Only touch the DOM when something changed, so CSS animations don't restart every second.
+  const key = JSON.stringify([html]);
+  if (key !== lastKey) { $("board").innerHTML = html; lastKey = key; }
+
+  const feed = $("feed");
+  stickFeed = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 30;
+  feed.innerHTML = events.map((e) => {
+    const t = new Date(e.at).toLocaleTimeString([], { hour12: false });
+    return `<div><span class="t">${esc(t)}</span><span class="k k-${esc(e.kind)}">${esc(e.kind)}</span>${esc(e.message)}</div>`;
+  }).join("") || '<div class="t">no events yet</div>';
+  if (stickFeed) feed.scrollTop = feed.scrollHeight;
+}
+
+async function poll() {
+  try {
+    const res = await fetch(FIXTURE ? "fixtures/run.json" : `${API}/api/runs/latest`);
+    if (!res.ok) throw new Error(res.status);
+    render(await res.json());
+    $("conn").textContent = FIXTURE ? "fixture" : "live"; $("conn").className = "pill live";
+  } catch (e) {
+    $("conn").textContent = "API offline"; $("conn").className = "pill off";
+  }
+}
+
+$("start").onclick = async () => {
+  $("start").disabled = true;
+  try { await fetch(`${API}/api/runs`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }); } catch {}
+  poll();
+};
+
+poll();
+setInterval(poll, 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "darwin-demo-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Buggy Stripe webhook service with intentional idempotency race condition for Darwin",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/bug.test.js"
+  }
+}
