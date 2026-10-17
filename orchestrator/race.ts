@@ -82,7 +82,7 @@ function parseReport(stdout: string, branchId: string): AttackReport {
 export async function runRace(opts: RaceOptions): Promise<RaceResult> {
   const { cfg, client, db } = opts;
   const agents = opts.agents ?? (await loadAgents());
-  const n = opts.n ?? 3;
+  let n = opts.n ?? 3;
   // Sandbox names are max 22 chars (lowercase, digits, hyphens): "dw-" + id + "-base" must fit, so keep the id at 6.
   const runId = `r${randomBytes(3).toString("hex").slice(0, 5)}`;
   const serviceDir = resolveServiceDir(cfg, opts.serviceDir);
@@ -103,8 +103,22 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
       await ev("cleanup", `${q0.running + q0.paused} sandbox(es) already live; removing leftovers first`);
       await os.destroyAllOurs(client);
     }
-    const q = await os.waitForSlots(client, n + 1);
-    await ev("info", `slots free: ${5 - q.live} of 5 (need ${n + 1})`);
+    // A fork that lands EXACTLY on 5/5 hangs instead of failing cleanly, so always keep one slot of headroom:
+    // peak concurrency is base + n forks, and we need live + n + 1 <= 4. Give leftovers a minute to drain,
+    // then shrink n rather than hit the cap.
+    let q = await os.quota(client);
+    const drainBy = Date.now() + 60_000;
+    while (q.live > 0 && Date.now() < drainBy) {
+      await new Promise((r) => setTimeout(r, 3_000));
+      q = await os.quota(client);
+    }
+    if (q.live > 0) {
+      const fit = 4 - q.live - 1; // forks that fit with one slot spare
+      if (fit < 2) throw new Error(`only ${5 - q.live} slot(s) free (${q.live} in use, ${q.other} transitional); need at least 4`);
+      if (fit < n) await ev("info", `${q.live} slot(s) still held by leftovers: using ${fit} forks instead of ${n}`);
+      n = Math.min(n, fit);
+    }
+    await ev("info", `slots free: ${5 - q.live} of 5; racing ${n} forks`);
 
     const files = await readServiceFiles(serviceDir);
     await ev("info", `service source: ${path.relative(cfg.rootDir, serviceDir)} (${Object.keys(files).length} files), ${n} candidates`);
