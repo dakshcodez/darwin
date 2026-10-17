@@ -25,7 +25,7 @@ export const SERVICE_PORT = 8080;
 const T = {
   create: 90_000,
   pause: 120_000,
-  forkWait: 60_000,
+  forkDeadline: 75_000,
   destroy: 90_000,
   exec: 120_000,
   port: 30_000,
@@ -124,20 +124,37 @@ export async function pauseBox(box: Box): Promise<void> {
   await box.sandbox.waitUntilPaused({ timeoutMs: T.pause });
 }
 
+/** Reject after `ms` no matter what the SDK is doing, and abort its in-flight requests. */
+export async function withDeadline<T>(ms: number, label: string, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(new Error(`${label} exceeded ${(ms / 1000).toFixed(0)}s`)), ms);
+  try {
+    return await Promise.race([
+      fn(ac.signal),
+      new Promise<never>((_, reject) => ac.signal.addEventListener("abort", () => reject(ac.signal.reason as Error))),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Fork a PAUSED base. Returns once the fork is running (or paused if startPaused).
- * Forks occasionally hang on the EU endpoint (seen 2 of ~8 forks, even below the concurrency cap), so the wait is
- * short and a stuck fork is destroyed instead of leaking a sandbox slot. Callers should retry.
+ * Forks sometimes hang on the EU endpoint (one 10-minute hang, several 60-180 s stalls), so every fork has a hard
+ * wall-clock deadline and a stuck fork is destroyed instead of leaking a slot. Callers fall back to a fresh copy.
  */
-export async function forkBox(base: Box, opts: { startPaused?: boolean; egress?: string[]; timeoutMs?: number } = {}): Promise<Box> {
-  const timeoutMs = opts.timeoutMs ?? T.forkWait;
-  const fork = await base.sandbox.fork({ start_paused: opts.startPaused, egress: opts.egress }, { timeoutMs: T.exec });
+export async function forkBox(base: Box, opts: { startPaused?: boolean; egress?: string[]; deadlineMs?: number } = {}): Promise<Box> {
+  const deadlineMs = opts.deadlineMs ?? T.forkDeadline;
+  let fork: Sandbox | undefined;
   try {
-    if (opts.startPaused) await fork.waitUntilPaused({ timeoutMs });
-    else await fork.waitUntilRunning({ timeoutMs });
-    return await toBox(fork);
+    await withDeadline(deadlineMs, "fork", async (signal) => {
+      fork = await base.sandbox.fork({ start_paused: opts.startPaused, egress: opts.egress }, { timeoutMs: T.exec, signal });
+      if (opts.startPaused) await fork.waitUntilPaused({ timeoutMs: deadlineMs, signal });
+      else await fork.waitUntilRunning({ timeoutMs: deadlineMs, signal });
+    });
+    return await toBox(fork!);
   } catch (e) {
-    await fork.destroy({ timeoutMs: T.destroy }).catch(() => undefined);
+    if (fork) await fork.destroy({ timeoutMs: T.destroy }).catch(() => undefined);
     throw e;
   }
 }
