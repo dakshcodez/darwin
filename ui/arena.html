@@ -961,6 +961,10 @@
       container.innerHTML = "";
       if (!run.id) {
         container.innerHTML = '<div class="empty-state">No run yet. Pick a target and press Start Race.</div>';
+      } else if (!candidates.length) {
+        container.innerHTML = run.status === "error"
+          ? '<div class="empty-state">This run failed before any candidate was created. The telemetry below says why.</div>'
+          : '<div class="empty-state">Preparing the base sandbox\u2026 candidates appear as soon as the snapshot is forked.</div>';
       }
 
       const STATUS = {
