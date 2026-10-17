@@ -1036,7 +1036,8 @@
 
   <script>
     const params = new URLSearchParams(location.search);
-    const API = params.get("api") || "http://localhost:3333";
+    // Served by the orchestrator (port 8787): same origin. Opened from a file or another port: talk to the orchestrator on 8787.
+    const API = params.get("api") || (location.protocol.startsWith("http") && location.port === "8787" ? "" : "http://localhost:8787");
     const FIXTURE = params.has("fixture");
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
