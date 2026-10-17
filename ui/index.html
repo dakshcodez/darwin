@@ -763,18 +763,20 @@
               <span class="term-shell">zsh</span>
             </div>
 
-            <pre class="term-pre"><code><span class="t-comment"># 1. Provision stack with Stripe Projects CLI</span>
+            <pre class="term-pre"><code><span class="t-comment"># 1. Provision the stack with Stripe Projects</span>
 <span class="t-prompt">$ </span><span class="t-cmd">stripe projects add createos/project</span>
 <span class="t-prompt">$ </span><span class="t-cmd">stripe projects add neon/postgres</span>
 <span class="t-prompt">$ </span><span class="t-cmd">stripe projects add openrouter/api</span>
 
-<span class="t-comment"># 2. Run Darwin autonomous race harness</span>
-<span class="t-prompt">$ </span><span class="t-cmd">npm run race -- --forks 3</span>
-<span class="t-dim">[orchestrator] Base snapshot paused (dw-base:8080)</span>
-<span class="t-dim">[orchestrator] Forked 3 micro-VMs in parallel (RAM &amp; processes copied)</span>
-<span class="t-dim">[builder] 3 candidate patches synthesized via OpenRouter</span>
-<span class="t-dim">[redteam] Dispatched 6 stress vectors across private peer network</span>
-<span class="t-pass">✔ Fix B survived all attacks. Promoted to production!</span>
+<span class="t-comment"># 2. Point Darwin at any project (output abridged from a real run)</span>
+<span class="t-prompt">$ </span><span class="t-cmd">./darwin run examples/slugify --test "npm test"</span>
+<span class="t-dim">baseline: tests FAIL (2/10 pass): the bug reproduces</span>
+<span class="t-dim">base snapshotted; forking 3 copies</span>
+<span class="t-dim">3/3 candidates ready (2 forks, 1 fresh copy)</span>
+<span class="t-dim">patch-a: 10/10 tests pass</span>
+<span class="t-dim">patch-b: 10/10 tests pass</span>
+<span class="t-dim">patch-c: 10/10 tests pass</span>
+<span class="t-pass">&#9733; winner: smallest passing patch, score 100 &middot; 112s</span>
 <span class="t-prompt">$ </span><span class="t-caret">▍</span></code></pre>
 
             <div class="term-footer">
@@ -806,12 +808,12 @@
           <dd class="spec-value">RAM &amp; Process State</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Stress Suite</dt>
-          <dd class="spec-value">6 Concurrency Vectors</dd>
+          <dt class="spec-label">Verdict By</dt>
+          <dd class="spec-value">Your Tests or Attack Suite</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Egress Firewall</dt>
-          <dd class="spec-value">Zero Internet Egress</dd>
+          <dt class="spec-label">Candidate Egress</dt>
+          <dd class="spec-value">Locked Down, No Internet</dd>
         </div>
         <div class="spec-cell">
           <dt class="spec-label">Survivorship</dt>
