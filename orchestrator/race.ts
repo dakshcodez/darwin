@@ -146,18 +146,27 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
     patchesP.catch(() => undefined); // surfaced when awaited below; avoids an unhandled rejection if forking fails first
     t = Date.now();
     const forks: os.Box[] = [];
-    let wanted = n;
-    for (let attempt = 1; attempt <= 2 && wanted > 0; attempt++) {
-      const results = await Promise.allSettled(Array.from({ length: wanted }, () => os.forkBox(base)));
-      let failed = 0;
-      results.forEach((r) => {
-        if (r.status === "fulfilled") { forks.push(r.value); created.push(r.value); }
-        else { failed++; void ev("error", `fork attempt ${attempt} failed: ${(r.reason as Error).message}`); }
-      });
-      wanted = failed;
-      if (failed && attempt < 2) await ev("fork", `retrying ${failed} stuck fork(s)`);
+    const forkResults = await Promise.allSettled(Array.from({ length: n }, () => os.forkBox(base)));
+    forkResults.forEach((r) => {
+      if (r.status === "fulfilled") { forks.push(r.value); created.push(r.value); }
+      else void ev("error", `fork failed: ${(r.reason as Error).message}`);
+    });
+    // Fallback for forks that never came up: a fresh sandbox from the same service files (no copied RAM, same race).
+    const copies: os.Box[] = [];
+    for (let i = forks.length; i < n; i++) {
+      try {
+        const c = await os.createBox(client, { name: `${runId}-c${i + 1}`, networkId: net.id });
+        created.push(c);
+        await os.pushFiles(c, toAbs(files));
+        await os.startService(c);
+        forks.push(c);
+        copies.push(c);
+        await ev("fork", `${c.name} created as a fresh copy (fork unavailable)`);
+      } catch (e) {
+        await ev("error", `fallback copy failed: ${(e as Error).message}`);
+      }
     }
-    await ev("fork", `${forks.length}/${n} forks running (${((Date.now() - t) / 1000).toFixed(1)}s)`);
+    await ev("fork", `${forks.length}/${n} candidates ready: ${forks.length - copies.length} forks, ${copies.length} fresh copies (${((Date.now() - t) / 1000).toFixed(1)}s)`);
     if (forks.length === 0) throw new Error("no forks could be created");
 
     // 3. Drop the base (frees a slot), then bring in the red team on the same network
@@ -189,7 +198,7 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
       branches.map(async (b) => {
         try {
           if (!b.patch) throw new Error("no patch generated for this fork");
-          await os.attachNetwork(b.box, net.id);
+          if (!copies.includes(b.box)) await os.attachNetwork(b.box, net.id); // fresh copies already joined at creation
           await os.setEgress(b.box, [red.ip]); // internet blocked; only the red team can talk to it
           await os.pushFiles(b.box, toAbs(b.patch.files));
           await os.restartService(b.box);
