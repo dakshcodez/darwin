@@ -129,6 +129,11 @@ Everyone must use **`https://api-eu.sb.createos.sh`** for the sandbox API (the d
 - **Scripts must `process.exit()`**: the SDK keeps sockets open, so a script never ends on its own.
 - Commands: `npm run race` (one race; `DARWIN_N=2` for fewer forks; `DARWIN_AGENTS=real` to use Part B's `agents/index.ts`), `npm run dev` (API on :8787), `npm run cleanup`, `npm run smoke`, `npm run doctor`, `npm run db:apply`.
 
+**A5 additions (orchestrator):**
+- **Stripe Projects in every run:** the first event of each run (`provision`) lists the stack `stripe projects status --json` reports (createos/project, Neon/postgres, OpenRouter/api) and how many credentials it synced, so the UI feed and demo show real Stripe Projects usage. Read-only, names only, never fails the run if the CLI is missing.
+- **Watchdog:** a run that exceeds 8 minutes is marked failed, our sandboxes are destroyed and the slots freed (so the UI never spins forever).
+- **Stripe webhook trigger:** `POST /api/stripe/webhook` verifies the Stripe signature and starts a race on `payment_intent.succeeded` (override with `DARWIN_TRIGGER_EVENT`). Needs `STRIPE_WEBHOOK_SECRET` (`stripe listen --print-secret`); `DARWIN_DRY=1` logs instead of racing. Tested with locally signed payloads (valid, other event type, wrong secret, no signature). **Not tested with a real `stripe trigger`**: the CLI on this machine is logged into the account's **live** mode and Stripe refuses test triggers there. To demo it, create a Stripe **sandbox** (Dashboard account picker -> Sandboxes, or `stripe switch`), then: `stripe listen --forward-to localhost:8787/api/stripe/webhook` in one terminal and `stripe trigger payment_intent.succeeded` in another. Never run triggers in live mode.
+
 **Orchestrator recipe (proven):** create net -> create base (on net) + red (on net) -> push service and `process start` -> pause base -> fork x3 (about 5.5 s each, can run in parallel) -> `attach` each fork to the net -> `setEgress([redIp, ...needed hosts])` on each fork -> red attacks `http://<forkIp>:8080` -> judge -> delete losers (and the base) -> `network rm` only when it has no members.
 Slot math: base(paused) + red + 3 forks = **5/5**, i.e. the cap. Safer: fork 2, or delete the base right after the last fork. Budget: one pre-kickoff test used about 5 creations.
 
