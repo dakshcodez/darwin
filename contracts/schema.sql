@@ -40,3 +40,6 @@ CREATE TABLE IF NOT EXISTS events (
   message text NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id, id);
+
+-- the unified diff of the candidate's patch, shown by the UI (added later; idempotent)
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS patch_diff text;

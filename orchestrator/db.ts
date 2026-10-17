@@ -37,17 +37,19 @@ export class Db {
     sandboxIp?: string | null;
     status: BranchStatus;
     patchRationale?: string | null;
+    patchDiff?: string | null;
   }): Promise<void> {
     await this.pool.query(
-      `insert into branches (id, run_id, parent_id, sandbox_id, sandbox_name, sandbox_ip, status, patch_rationale)
-       values ($1,$2,$3,$4,$5,$6,$7,$8)
+      `insert into branches (id, run_id, parent_id, sandbox_id, sandbox_name, sandbox_ip, status, patch_rationale, patch_diff)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        on conflict (id) do update set
          sandbox_id = coalesce(excluded.sandbox_id, branches.sandbox_id),
          sandbox_name = coalesce(excluded.sandbox_name, branches.sandbox_name),
          sandbox_ip = coalesce(excluded.sandbox_ip, branches.sandbox_ip),
          status = excluded.status,
-         patch_rationale = coalesce(excluded.patch_rationale, branches.patch_rationale)`,
-      [b.id, b.runId, b.parentId ?? null, b.sandboxId ?? null, b.sandboxName ?? null, b.sandboxIp ?? null, b.status, b.patchRationale ?? null],
+         patch_rationale = coalesce(excluded.patch_rationale, branches.patch_rationale),
+         patch_diff = coalesce(excluded.patch_diff, branches.patch_diff)`,
+      [b.id, b.runId, b.parentId ?? null, b.sandboxId ?? null, b.sandboxName ?? null, b.sandboxIp ?? null, b.status, b.patchRationale ?? null, b.patchDiff ?? null],
     );
   }
 
