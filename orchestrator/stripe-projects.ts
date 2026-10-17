@@ -51,6 +51,21 @@ export async function stackSummary(): Promise<StackSummary> {
     }
     return { ok: true, project: status.data?.project?.name, services, envVarNames };
   } catch (e) {
+    // No Stripe CLI on this host (a hosted server): report what the environment shows, and say so.
+    const fromEnv = [
+      process.env.CREATEOS_PROJECT_API_KEY && ["createos", "project"],
+      process.env.NEON_POSTGRES_CONNECTION_STRING && ["neon", "postgres"],
+      process.env.OPENROUTER_API_KEY && ["openrouter", "api"],
+    ].filter(Boolean) as string[][];
+    if (fromEnv.length) {
+      return {
+        ok: true,
+        project: "darwin",
+        services: fromEnv.map(([provider, service]) => ({ name: `${provider}-${service}`, provider, service, tier: "", status: "credentials present" })),
+        envVarNames: [],
+        note: "read from the environment: the Stripe CLI is not installed on this host",
+      };
+    }
     return { ok: false, services: [], envVarNames: [], note: `stripe CLI unavailable: ${(e as Error).message.split("\n")[0]}` };
   }
 }
@@ -59,5 +74,5 @@ export function describeStack(s: StackSummary): string {
   if (!s.ok) return `Stripe Projects: ${s.note ?? "not available"}`;
   const svc = s.services.map((x) => `${x.provider}/${x.service} (${x.status})`).join(", ") || "no services";
   const creds = s.envVarNames.length ? `; ${s.envVarNames.length} credentials and settings synced to .env by one CLI` : "";
-  return `Stripe Projects stack for "${s.project}": ${svc}${creds}`;
+  return `Stripe Projects stack for "${s.project}": ${svc}${creds}${s.note ? ` (${s.note})` : ""}`;
 }
