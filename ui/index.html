@@ -842,7 +842,7 @@
           <span class="step-num">01 / SNAPSHOT</span>
           <h3 class="step-title">Base Snapshot</h3>
           <p class="step-desc">
-            The service is booted inside a base CreateOS micro-VM. Once healthy, Darwin pauses the VM to serialize memory, disk, and socket state into a byte-identical snapshot.
+            The service is booted inside a base CreateOS micro-VM. Once healthy, Darwin pauses the VM to snapshot its memory, disk and process state.
           </p>
         </div>
 
@@ -858,7 +858,7 @@
           <span class="step-num">03 / RED-TEAM</span>
           <h3 class="step-title">Adversarial Assault</h3>
           <p class="step-desc">
-            An isolated red-team attacker VM launches concurrent duplicate bursts, malformed payloads, and replay attacks across an isolated CreateOS private network.
+            An isolated red-team VM fires concurrent duplicate bursts, malformed payloads and replay attacks at every candidate over a private CreateOS network. For your own code, your test suite plays that role inside each locked-down fork.
           </p>
         </div>
 
@@ -866,7 +866,7 @@
           <span class="step-num">04 / SELECTION</span>
           <h3 class="step-title">Darwinian Promotion</h3>
           <p class="step-desc">
-            The scoring judge verifies ledger invariants. Broken forks are instantly killed and destroyed; only the verified survivor is promoted to live production.
+            The judge scores every candidate. Failing forks are eliminated and destroyed; the highest-scoring survivor is promoted as the winning fix (the smallest patch wins a tie).
           </p>
         </div>
       </div>
@@ -882,7 +882,7 @@
           </div>
           <h4 class="pillar-title">Stripe Projects CLI</h4>
           <p class="pillar-desc">
-            Single-command setup from the terminal. Automatically provisions CreateOS compute, Neon Postgres run history, and OpenRouter LLMs without manual dashboard setup.
+            Single-command setup from the terminal. Provisions CreateOS compute, a Neon Postgres database for run history, and an OpenRouter account without opening a dashboard.
           </p>
         </div>
 
@@ -897,7 +897,7 @@
           </div>
           <h4 class="pillar-title">CreateOS Firecracker</h4>
           <p class="pillar-desc">
-            True hardware-isolated micro-VMs with dedicated Linux kernels, sub-50ms boot times, memory-level snapshotting, and strict kernel-enforced egress allowlists.
+            True hardware-isolated micro-VMs with dedicated Linux kernels, ~30 ms boot times, memory-level snapshotting, and strict kernel-enforced egress allowlists.
           </p>
         </div>
 
@@ -911,7 +911,7 @@
           </div>
           <h4 class="pillar-title">Neon Postgres DB</h4>
           <p class="pillar-desc">
-            Serverless database capturing complete run history, branch lifecycles, attack vector assertions, and audit telemetry events with instant schema migrations.
+            Serverless database capturing complete run history, branch lifecycles, attack vector assertions, and audit telemetry events.
           </p>
         </div>
       </div>
