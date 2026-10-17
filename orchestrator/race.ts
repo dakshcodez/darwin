@@ -220,7 +220,7 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
           await os.restartService(b.box);
           await ev("patch", `${b.id}: patch applied, service restarted (${b.patch.rationale})`);
           await db.setBranchStatus(b.id, "attacking");
-          const r = await os.exec(red, "node", ["/app/attack.js", `http://${b.box.ip}:${os.SERVICE_PORT}`, b.id], { timeoutMs: 150_000 });
+          const r = await os.exec(red, "node", ["/app/attack.js", `http://${b.box.ip}:${os.SERVICE_PORT}`, b.id], { timeoutMs: 60_000 });
           const report = parseReport(r.stdout, b.id);
           await db.saveAttacks(report);
           reports.push(report);
