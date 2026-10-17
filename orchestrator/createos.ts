@@ -60,7 +60,8 @@ export async function createBox(client: CreateosSandboxClient, o: CreateBoxOptio
       networks: o.networkId ? [{ id: o.networkId }] : undefined,
       egress: o.egress,
       ingress_enabled: o.ingress,
-      envs: o.envs,
+      // env keys used later by exec/process must be declared here: undeclared keys are rejected with a 400
+      envs: { PORT: String(SERVICE_PORT), ...(o.envs ?? {}) },
     },
     { wait: true, waitTimeoutMs: T.create },
   );
@@ -98,7 +99,7 @@ export async function startService(box: Box, opts: { cwd?: string; cmd?: string;
     cmd: opts.cmd ?? "npm",
     args: opts.args ?? ["start"],
     cwd: opts.cwd ?? APP_DIR,
-    env: { PORT: String(SERVICE_PORT), ...(opts.env ?? {}) },
+    env: { PORT: String(SERVICE_PORT), ...(opts.env ?? {}) }, // every key must have been declared at createBox time
   });
   await box.sandbox.waitForPortReady(SERVICE_PORT, { timeoutMs: T.port });
   return proc.process_id;
