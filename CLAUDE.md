@@ -119,6 +119,8 @@ Everyone must use **`https://api-eu.sb.createos.sh`** for the sandbox API (the d
 | `exec` with a background job | Hangs unless stdio is redirected; use `sandbox process start` (worked) |
 | `whoami` | Shows `Plan free-plan` even on the account with the 5-cap; don't rely on it |
 
+**Wrapper smoke test (`npm run`-able via `npx tsx infra/smoke.ts`, EU endpoint, through `orchestrator/createos.ts`):** create base+red in parallel 0.6 s; start service + port ready 0.8 s; pause base 8.0 s; **fork x2 in parallel 10.2 s** (so 3 parallel forks should be about 10-12 s, better than the 15 s per fork planned for); attach to network 0.2 s; cleanup 1.0 s. **New rule:** env keys used by `exec`/`process` must be **declared at sandbox creation** (`envs`), otherwise the API returns `400 env key "X" was not declared at sandbox creation`. `createBox` declares `PORT` for you; declare any other key in `CreateBoxOptions.envs`.
+
 **Orchestrator recipe (proven):** create net -> create base (on net) + red (on net) -> push service and `process start` -> pause base -> fork x3 (about 5.5 s each, can run in parallel) -> `attach` each fork to the net -> `setEgress([redIp, ...needed hosts])` on each fork -> red attacks `http://<forkIp>:8080` -> judge -> delete losers (and the base) -> `network rm` only when it has no members.
 Slot math: base(paused) + red + 3 forks = **5/5**, i.e. the cap. Safer: fork 2, or delete the base right after the last fork. Budget: one pre-kickoff test used about 5 creations.
 
