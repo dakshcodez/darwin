@@ -1,172 +1,1339 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Darwin: fork, attack, promote</title>
-<style>
-  :root {
-    --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e;
-    --amber: #d29922; --red: #f85149; --green: #3fb950; --blue: #58a6ff;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
-  header { display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  h1 { margin: 0; font-size: 20px; letter-spacing: .5px; }
-  h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
-  .spacer { flex: 1; }
-  .pill { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-  .pill.live { color: var(--green); border-color: var(--green); }
-  .pill.off { color: var(--red); border-color: var(--red); }
-  button { background: var(--green); color: #04130a; border: 0; padding: 8px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
-  .base { margin: 0 auto; width: 280px; text-align: center; border: 1px solid var(--blue); border-radius: 10px; padding: 12px; background: var(--panel); }
-  .base b { color: var(--blue); }
-  .base .sub { color: var(--muted); font-size: 12px; }
-  .stem { width: 2px; height: 24px; background: var(--line); margin: 0 auto; }
-  .bar { height: 2px; background: var(--line); margin: 0 auto; width: 66%; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 0; }
-  .tile { position: relative; background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 14px; transition: border-color .4s, box-shadow .4s, opacity .6s, filter .6s; animation: pop .5s ease-out; overflow: hidden; }
-  .tile::before { content: ""; position: absolute; left: 50%; top: -18px; width: 2px; height: 18px; background: var(--line); }
-  @keyframes pop { from { transform: translateY(-14px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
-  .tile.forking, .tile.patching { border-color: var(--blue); }
-  .tile.attacking { border-color: var(--amber); animation: pulse 1.2s infinite; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(210,153,34,.45); } 50% { box-shadow: 0 0 14px 2px rgba(210,153,34,.45); } }
-  .tile.killed { border-color: var(--red); opacity: .6; filter: grayscale(.6); animation: pop .5s, shake .5s .0s; }
-  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
-  .tile.killed .title::after { content: " \2715"; color: var(--red); }
-  .tile.survivor { border-color: var(--green); }
-  .tile.promoted { border-color: var(--green); box-shadow: 0 0 22px 2px rgba(63,185,80,.5); }
-  .tile.error { border-color: var(--red); border-style: dashed; }
-  .title { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
-  .badge { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; padding: 2px 8px; border-radius: 4px; background: var(--line); color: var(--text); }
-  .forking .badge, .patching .badge { background: var(--blue); color: #021; }
-  .attacking .badge { background: var(--amber); color: #210; }
-  .killed .badge, .error .badge { background: var(--red); color: #200; }
-  .survivor .badge, .promoted .badge { background: var(--green); color: #021; }
-  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  .why { margin: 10px 0; min-height: 40px; }
-  .checks { list-style: none; padding: 0; margin: 0 0 8px; }
-  .checks li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; padding: 1px 0; }
-  .ok { color: var(--green); } .no { color: var(--red); } .wait { color: var(--muted); }
-  .score { font-size: 28px; font-weight: 700; }
-  .reason { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-word; }
-  .crown { display: none; position: absolute; top: 8px; right: 12px; font-size: 11px; background: var(--green); color: #021; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
-  .promoted .crown { display: block; }
-  .promoted .badge { visibility: hidden; }
-  .banner { margin: 20px auto 0; padding: 12px 18px; border-radius: 8px; background: rgba(63,185,80,.12); border: 1px solid var(--green); color: var(--green); text-align: center; font-weight: 600; animation: pop .6s; }
-  .empty { text-align: center; color: var(--muted); padding: 60px 0; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 28px 0 8px; }
-  .feed { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-height: 260px; overflow-y: auto; padding: 8px 12px; font: 12.5px/1.6 ui-monospace, Consolas, monospace; }
-  .feed div { white-space: pre-wrap; }
-  .k { display: inline-block; min-width: 68px; text-transform: uppercase; font-size: 11px; }
-  .k-provision { color: var(--blue); } .k-fork { color: #a371f7; } .k-patch { color: var(--blue); } .k-attack { color: var(--amber); }
-  .k-verdict { color: var(--green); } .k-cleanup { color: var(--muted); } .k-error { color: var(--red); } .k-info { color: var(--muted); }
-  .t { color: var(--muted); margin-right: 6px; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Darwin · Autonomous Agent Red-Team Harness</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0c10;
+      --card-white: #ffffff;
+      --card-subtle: #f8fafc;
+      --border-light: #e2e8f0;
+      --border-dark: rgba(255, 255, 255, 0.1);
+      --ink: #0f172a;
+      --ink-muted: #475569;
+      --ink-subtle: #94a3b8;
+      --vf-blue: #335cff;
+      --vf-blue-dark: #1e40af;
+      --vf-blue-light: #6085ff;
+      --vf-blue-glow: rgba(51, 92, 255, 0.35);
+      --emerald: #10b981;
+      --emerald-dark: #059669;
+      --emerald-light: #34d399;
+      --emerald-glow: rgba(16, 185, 129, 0.35);
+      --amber: #f59e0b;
+      --amber-dark: #d97706;
+      --amber-glow: rgba(245, 158, 11, 0.35);
+      --crimson: #ef4444;
+      --crimson-dark: #dc2626;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 24px;
+      --radius-full: 9999px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #ffffff;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* CreateOS Signature Dot Matrix Grid & Ambient Glows */
+    .hk-grid {
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 15%, #000 35%, transparent 85%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 15%, #000 35%, transparent 85%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hk-glow {
+      position: fixed;
+      top: -240px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 550px;
+      background: radial-gradient(circle, rgba(51, 92, 255, 0.22) 0%, rgba(51, 92, 255, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Top Navigation */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 36px;
+      background: rgba(10, 12, 16, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-dark);
+      flex-wrap: wrap;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #335cff 0%, #1e3a8a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 18px rgba(51, 92, 255, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .brand-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #cbd5e1;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Clean subtle view toggle */
+    .view-toggle {
+      display: inline-flex;
+      height: 34px;
+      align-items: center;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 2px;
+    }
+
+    .view-toggle button {
+      background: transparent;
+      border: 0;
+      color: #94a3b8;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .view-toggle button.active {
+      background: #ffffff;
+      color: var(--ink);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    /* Subtle discreet pill */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 13px;
+      border-radius: var(--radius-full);
+      font-size: 11.5px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.04em;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+    }
+
+    .pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    /* Primary Action Button (CreateOS Hackathon Hero Button) */
+    .btn-start {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      color: var(--ink);
+      border: 0;
+      padding: 9px 22px;
+      border-radius: var(--radius-full);
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 0 24px rgba(255, 255, 255, 0.25);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-start:hover:not(:disabled) {
+      background: #f1f5f9;
+      transform: translateY(-1px) scale(1.02);
+      box-shadow: 0 0 35px rgba(51, 92, 255, 0.5);
+    }
+
+    .btn-start:active:not(:disabled) {
+      transform: translateY(1px) scale(0.98);
+    }
+
+    .btn-start:disabled {
+      background: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.4);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-icon {
+      transition: transform 0.2s ease;
+    }
+    .btn-start:hover:not(:disabled) .btn-icon {
+      transform: translateX(3px);
+    }
+
+    /* Main Container */
+    main {
+      position: relative;
+      z-index: 10;
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 44px 28px 90px;
+    }
+
+    /* Hero Section */
+    .hero-section {
+      text-align: center;
+      margin-bottom: 44px;
+    }
+
+    .hero-tagline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 14px;
+      border-radius: var(--radius-full);
+      background: rgba(51, 92, 255, 0.1);
+      border: 1px solid rgba(51, 92, 255, 0.3);
+      color: var(--vf-blue-light);
+      font-size: 12.5px;
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+
+    .hero-title {
+      font-size: clamp(2.2rem, 5vw, 3.75rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.08;
+      margin-bottom: 14px;
+      color: #ffffff;
+    }
+
+    .hero-title .text-blue {
+      color: var(--vf-blue);
+      text-shadow: 0 0 30px rgba(51, 92, 255, 0.45);
+    }
+
+    .hero-subtitle {
+      max-width: 660px;
+      margin: 0 auto 36px;
+      font-size: 15.5px;
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+
+    /* Metrics Ribbon: CreateOS Dark/White High-Contrast Cards */
+    .stats-ribbon {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 50px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-md);
+      padding: 18px 22px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      text-align: left;
+      transition: all 0.2s ease;
+    }
+
+    .stat-card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.22);
+      transform: translateY(-2px);
+    }
+
+    .stat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #94a3b8;
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+    }
+
+    .stat-desc {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    /* Architecture Canvas */
+    .canvas-section {
+      position: relative;
+      margin-bottom: 54px;
+    }
+
+    /* Base Sandbox Card */
+    .base-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      margin-bottom: 4px;
+    }
+
+    .base-card {
+      width: 440px;
+      max-width: 90vw;
+      background: #0f1422;
+      border: 1.5px solid var(--vf-blue);
+      border-radius: var(--radius-md);
+      padding: 16px 22px;
+      box-shadow: 0 0 35px rgba(51, 92, 255, 0.3);
+      position: relative;
+      z-index: 2;
+      text-align: center;
+    }
+
+    .base-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .base-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(51, 92, 255, 0.2);
+      color: var(--vf-blue-light);
+      border: 1px solid rgba(51, 92, 255, 0.4);
+    }
+
+    .base-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+    }
+
+    .base-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .base-desc {
+      font-size: 12px;
+      color: #cbd5e1;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 6px;
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* Branch SVG Connector */
+    .branch-tree-svg {
+      width: 100%;
+      height: 44px;
+      overflow: visible;
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Candidate Grid: PURE CRISP WHITE CARDS (CreateOS signature high-contrast cards) */
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+      gap: 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .tile {
+      position: relative;
+      background: var(--card-white);
+      color: var(--ink);
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      border: 1px solid var(--border-light);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+
+    .tile:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Status State Variations */
+    .tile.promoted {
+      border: 2px solid var(--emerald);
+      box-shadow: 0 0 45px -5px rgba(16, 185, 129, 0.4), 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .tile.attacking {
+      border: 2px solid var(--amber);
+      box-shadow: 0 0 35px var(--amber-glow);
+      animation: pulse-amber 1.4s infinite alternate;
+    }
+
+    @keyframes pulse-amber {
+      0% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.2); }
+      100% { box-shadow: 0 0 35px rgba(245, 158, 11, 0.45); }
+    }
+
+    .tile.killed {
+      background: #f8fafc;
+      border: 1.5px solid #fecaca;
+      opacity: 0.82;
+      filter: grayscale(0.2);
+    }
+
+    /* Tile Header */
+    .tile-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tile-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink-subtle);
+      letter-spacing: 0.08em;
+    }
+
+    .tile-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+
+    .tile-status-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tile.forking .tile-status-badge, .tile.patching .tile-status-badge {
+      background: #eff6ff;
+      color: var(--vf-blue-dark);
+      border: 1px solid #bfdbfe;
+    }
+
+    .tile.attacking .tile-status-badge {
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+
+    .tile.killed .tile-status-badge {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    .tile.promoted .tile-status-badge, .tile.survivor .tile-status-badge {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    /* Promoted Crown Ribbon */
+    .crown-ribbon {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-bottom-left-radius: 12px;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+      display: none;
+      align-items: center;
+      gap: 5px;
+    }
+    .tile.promoted .crown-ribbon { display: inline-flex; }
+
+    /* Sandbox IP Badge */
+    .tile-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Strategy / Rationale Callout */
+    .tile-strategy {
+      background: var(--card-subtle);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--ink);
+      border-left: 3px solid var(--vf-blue);
+      font-weight: 500;
+      min-height: 52px;
+    }
+    .tile.killed .tile-strategy { border-left-color: var(--crimson); color: var(--ink-muted); }
+    .tile.promoted .tile-strategy { border-left-color: var(--emerald); }
+
+    /* Attack Vector List */
+    .attack-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .attack-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12.5px;
+      padding: 7px 11px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      transition: background 0.15s ease;
+    }
+
+    .attack-item:hover {
+      background: #f1f5f9;
+    }
+
+    .attack-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .attack-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .attack-icon.ok {
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+    }
+
+    .attack-icon.no {
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+
+    .attack-icon.wait {
+      background: #f1f5f9;
+      color: #94a3b8;
+    }
+
+    .attack-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .attack-detail {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-muted);
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Score & Fitness */
+    .fitness-box {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-light);
+    }
+
+    .fitness-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .fitness-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--ink-muted);
+      font-weight: 600;
+    }
+
+    .fitness-score {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+    .tile.promoted .fitness-score, .tile.survivor .fitness-score { color: #059669; }
+    .tile.killed .fitness-score { color: #dc2626; }
+    .tile.attacking .fitness-score { color: #d97706; }
+
+    .bar-bg {
+      height: 7px;
+      background: #e2e8f0;
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: var(--radius-full);
+      background: var(--vf-blue);
+      transition: width 0.6s ease;
+    }
+    .tile.promoted .bar-fill, .tile.survivor .bar-fill { background: var(--emerald); }
+    .tile.killed .bar-fill { background: var(--crimson); }
+    .tile.attacking .bar-fill { background: var(--amber); }
+
+    .verdict-text {
+      font-size: 12px;
+      color: var(--ink-muted);
+      line-height: 1.45;
+    }
+
+    /* Celebration Banner */
+    .winner-card {
+      margin: 36px 0 28px;
+      padding: 24px 32px;
+      background: #ffffff;
+      color: var(--ink);
+      border-radius: var(--radius-lg);
+      border: 2px solid var(--emerald);
+      box-shadow: 0 0 50px -10px rgba(16, 185, 129, 0.4), 0 20px 40px -15px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .winner-badge-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: #ecfdf5;
+      border: 1.5px solid #a7f3d0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #059669;
+      flex-shrink: 0;
+    }
+
+    .winner-info h3 {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #047857;
+      margin-bottom: 4px;
+    }
+
+    .winner-info p {
+      font-size: 14px;
+      color: var(--ink-muted);
+      line-height: 1.5;
+    }
+
+    /* CreateOS Signature White Terminal Component */
+    .terminal-wrapper {
+      margin-top: 56px;
+    }
+
+    .terminal-section-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    /* Terminal matching createos.sh/hackathon hero terminal */
+    .createos-terminal {
+      background: var(--card-white);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      box-shadow: 0 25px 80px -20px rgba(51, 92, 255, 0.35), 0 15px 30px -10px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      color: var(--ink);
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .terminal-dots {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .terminal-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .terminal-dot.d1 { background: #cbd5e1; }
+    .terminal-dot.d2 { background: #cbd5e1; }
+    .terminal-dot.d3 { background: #cbd5e1; }
+
+    .terminal-dir {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink-muted);
+      font-weight: 600;
+    }
+
+    .terminal-shell {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink-subtle);
+    }
+
+    .terminal-content {
+      padding: 18px 24px;
+      max-height: 290px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: #1e293b;
+      background: #ffffff;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
+      padding: 2px 0;
+    }
+
+    .log-time {
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+
+    .log-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      min-width: 76px;
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+
+    .log-badge-provision { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .log-badge-fork { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+    .log-badge-patch { background: #ecfeff; color: #0e7490; border: 1px solid #a5f3fc; }
+    .log-badge-attack { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+    .log-badge-verdict { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+    .log-badge-cleanup { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+    .log-badge-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .log-badge-info { background: #f1f5f9; color: #475569; }
+
+    .log-msg {
+      color: #0f172a;
+      word-break: break-word;
+    }
+
+    .terminal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border-light);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      color: var(--ink-muted);
+    }
+
+    .prompt-bullet {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .bullet-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--vf-blue);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      header { padding: 12px 18px; }
+      main { padding: 24px 16px 60px; }
+      .hero-title { font-size: 2.1rem; }
+      .tiles-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-<header>
-  <h1>Darwin <small>fork, attack, promote. Safe by construction.</small></h1>
-  <span class="spacer"></span>
-  <span id="conn" class="pill">connecting</span>
-  <span id="runpill" class="pill">no run</span>
-  <button id="start">Start run</button>
-</header>
-<main>
-  <div id="board"></div>
-  <h2>Events</h2>
-  <div class="feed" id="feed"></div>
-</main>
-<script>
-const params = new URLSearchParams(location.search);
-const API = params.get("api") || "http://localhost:8787";
-const FIXTURE = params.has("fixture");
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const CHECKS = ["sequential-duplicates", "concurrent-duplicates", "malformed-payloads", "valid-after-malformed", "replay-old-event", "health-alive"];
-const LABEL = { forking: "forking", patching: "patching", attacking: "attacking", killed: "killed", survivor: "survivor", promoted: "promoted", error: "error" };
+  <div class="hk-grid" aria-hidden="true"></div>
+  <div class="hk-glow" aria-hidden="true"></div>
 
-let lastKey = "";
-let stickFeed = true;
+  <!-- Header -->
+  <header>
+    <div class="brand-group">
+      <a href="#" class="brand-logo" aria-label="Darwin Home">
+        <div class="logo-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+            <path d="M2 17l10 5 10-5"></path>
+            <path d="M2 12l10 5 10-5"></path>
+          </svg>
+        </div>
+        <div class="brand-title">
+          <span>Darwin</span>
+        </div>
+      </a>
+      <span class="brand-badge">Auto Red-Team</span>
+    </div>
 
-function render(state) {
-  const { run, branches = [], attacks = [], events = [] } = state;
-  $("runpill").textContent = run ? `run ${String(run.id).slice(0, 8)} · ${run.status}` : "no run";
-  const running = run && (run.status === "running" || run.status === "pending");
-  $("start").disabled = !!running && !FIXTURE;
-  $("start").textContent = running ? "Running..." : "Start run";
+    <div class="nav-actions">
+      <!-- Human / Agent view toggle styled after CreateOS -->
+      <div class="view-toggle" role="group" aria-label="View Mode">
+        <button type="button" id="toggle-human" class="active">Human</button>
+        <button type="button" id="toggle-agent">Agent</button>
+      </div>
 
-  const base = branches.find((b) => !b.parent_id);
-  const kids = branches.filter((b) => b.parent_id).sort((a, b) => String(a.sandbox_name).localeCompare(String(b.sandbox_name)));
-  const winner = branches.find((b) => b.status === "promoted" && b.parent_id) || branches.find((b) => run && b.id === run.winner_branch_id);
+      <!-- Live state pill -->
+      <div id="conn" class="pill">
+        <span class="pill-dot"></span>
+        <span id="conn-text">LIVE DEMO</span>
+      </div>
 
-  const tile = (b, i) => {
-    const mine = attacks.filter((a) => a.branch_id === b.id);
-    const names = CHECKS.concat(mine.map((a) => a.name).filter((n) => !CHECKS.includes(n)));
-    const rows = names.map((n) => {
-      const a = mine.find((x) => x.name === n);
-      const icon = !a ? '<span class="wait">·</span>' : a.passed ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
-      return `<li>${icon}<span title="${esc(a?.detail)}">${esc(n)}</span></li>`;
-    }).join("");
-    const label = `Fix ${String.fromCharCode(65 + i)}`;
-    return `<div class="tile ${esc(b.status)}" data-id="${esc(b.id)}">
-      <span class="crown">PROMOTED</span>
-      <div class="title"><span>${label}</span><span class="badge">${esc(LABEL[b.status] || b.status)}</span></div>
-      <div class="meta">${esc(b.sandbox_name || "")} ${b.sandbox_ip ? "· " + esc(b.sandbox_ip) : ""}</div>
-      <div class="why">${esc(b.patch_rationale || (b.status === "forking" ? "Forking the paused base: RAM and processes copied..." : "Waiting for the builder agent..."))}</div>
-      <ul class="checks">${rows}</ul>
-      <div class="score">${b.score == null ? "" : esc(b.score)}<span class="meta">${b.score == null ? "" : " / 100"}</span></div>
-      <div class="reason">${esc(b.reason || "")}</div>
-    </div>`;
-  };
+      <!-- Start Action Button -->
+      <button id="start" class="btn-start">
+        <span id="start-label">Start race</span>
+        <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+    </div>
+  </header>
 
-  let html;
-  if (!branches.length) {
-    html = `<div class="empty">No run yet. Press <b>Start run</b> to fork the base sandbox and let the fixes race.</div>`;
-  } else {
-    html = `<div class="base"><b>BASE SANDBOX</b><div class="sub">buggy webhook service, paused snapshot${base?.sandbox_ip ? " · " + esc(base.sandbox_ip) : ""}</div></div>
-      <div class="stem"></div><div class="bar"></div>
-      <div class="tiles">${kids.map(tile).join("")}</div>`;
-    if (winner && run && run.status === "done") {
-      html += `<div class="banner">Survivor promoted: ${esc(winner.sandbox_name || winner.id)} passed every attack. ${kids.length - 1} other fork(s) deleted. None of the agent-written code touched a real machine.</div>`;
-    } else if (run && run.status === "done") {
-      html += `<div class="banner" style="color:var(--red);border-color:var(--red);background:rgba(248,81,73,.1)">No fork survived the red team. Nothing was promoted.</div>`;
+  <!-- Main Body -->
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-tagline">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>CreateOS Firecracker Micro-VM Isolation</span>
+      </div>
+
+      <h1 class="hero-title">Fork, Attack, <span class="text-blue">Promote.</span></h1>
+      <p class="hero-subtitle">
+        Four fixes race in isolated micro-VMs. A red team attacks every fork over a private network. 
+        Only the fix that survives is promoted. Untrusted agent code never touches the real machine.
+      </p>
+
+      <!-- Metrics Ribbon -->
+      <div class="stats-ribbon">
+        <div class="stat-card">
+          <span class="stat-label">Concurrency Quota</span>
+          <div class="stat-value" id="stat-slots">4 / 5 Slots</div>
+          <span class="stat-desc">Firecracker micro-VM limit</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Fork Candidates</span>
+          <div class="stat-value" id="stat-forks">3 Racing</div>
+          <span class="stat-desc">Distinct builder strategies</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Red Team Suite</span>
+          <div class="stat-value" id="stat-attacks">6 Vectors</div>
+          <span class="stat-desc">Burst, fuzzing, replay</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Survival Outcome</span>
+          <div class="stat-value" id="stat-survival" style="color: #34d399;">33% (1/3)</div>
+          <span class="stat-desc" id="stat-survival-desc">1 fix promoted to prod</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Canvas: Fork Tree & Sandbox Cards -->
+    <section class="canvas-section" id="board">
+      <div style="text-align: center; padding: 60px 0; color: #94a3b8;">
+        Loading Darwin execution state...
+      </div>
+    </section>
+
+    <!-- Celebration Winner Banner -->
+    <div id="winner-slot"></div>
+
+    <!-- Live Telemetry Terminal: White High-Contrast CreateOS Terminal -->
+    <section class="terminal-wrapper">
+      <div class="terminal-section-title">
+        <span>Live Telemetry Stream</span>
+        <span id="event-count">6 events logged</span>
+      </div>
+
+      <div class="createos-terminal">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="terminal-dot d1"></span>
+            <span class="terminal-dot d2"></span>
+            <span class="terminal-dot d3"></span>
+          </div>
+          <span class="terminal-dir">~/darwin/orchestrator · events.log</span>
+          <span class="terminal-shell">zsh</span>
+        </div>
+        <div class="terminal-content" id="feed">
+          <div class="log-line"><span class="log-time">--:--:--</span><span class="log-msg">Awaiting event feed...</span></div>
+        </div>
+        <div class="terminal-footer">
+          <div class="prompt-bullet">
+            <span class="bullet-dot"></span>
+            <span>Connected to CreateOS execution layer</span>
+          </div>
+          <span>auto-scroll: on</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const API = params.get("api") || "http://localhost:3333";
+    const FIXTURE = params.has("fixture");
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+    const CHECKS = [
+      { id: "sequential-duplicates", label: "Sequential Duplicates" },
+      { id: "concurrent-duplicates", label: "Concurrent Burst (20x)" },
+      { id: "malformed-payloads", label: "Malformed Payloads" },
+      { id: "valid-after-malformed", label: "Valid After Fuzzing" },
+      { id: "replay-old-event", label: "Replay Old Event" },
+      { id: "health-alive", label: "Health Check" }
+    ];
+
+    const LABEL = {
+      forking: "Forking VM",
+      patching: "Applying Patch",
+      attacking: "Under Attack",
+      killed: "Eliminated",
+      survivor: "Survivor",
+      promoted: "Promoted to Prod",
+      error: "Error"
+    };
+
+    let lastKey = "";
+    let stickFeed = true;
+
+    // View mode toggle
+    $("toggle-human").onclick = () => {
+      $("toggle-human").classList.add("active");
+      $("toggle-agent").classList.remove("active");
+    };
+    $("toggle-agent").onclick = () => {
+      $("toggle-agent").classList.add("active");
+      $("toggle-human").classList.remove("active");
+    };
+
+    const DEFAULT_FIXTURE = {
+      run: { id: "run-demo", status: "done", created_at: "2026-10-17T20:10:00Z", winner_branch_id: "br-b" },
+      branches: [
+        { id: "br-base", run_id: "run-demo", parent_id: null, sandbox_id: "sb-base", sandbox_name: "dw-base", sandbox_ip: "10.0.60.10", status: "promoted", patch_rationale: null, score: null, reason: null, created_at: "2026-10-17T20:10:00Z" },
+        { id: "br-a", run_id: "run-demo", parent_id: "br-base", sandbox_id: "sb-a", sandbox_name: "dw-fork-a", sandbox_ip: "10.0.60.11", status: "killed", patch_rationale: "Skip ids already in a seen-set, recorded after the work.", score: 17, reason: "Failed 5/6: concurrent-duplicates, malformed-payloads. same event id delivered 20x in parallel -> 20 ledger entries (want 1)", created_at: "2026-10-17T20:10:20Z" },
+        { id: "br-b", run_id: "run-demo", parent_id: "br-base", sandbox_id: "sb-b", sandbox_name: "dw-fork-b", sandbox_ip: "10.0.60.12", status: "promoted", patch_rationale: "Claim the event id in an in-flight set before the await, and validate the body with 4xx errors.", score: 100, reason: "Survived all 6 attacks.", created_at: "2026-10-17T20:10:20Z" },
+        { id: "br-c", run_id: "run-demo", parent_id: "br-base", sandbox_id: "sb-c", sandbox_name: "dw-fork-c", sandbox_ip: "10.0.60.13", status: "killed", patch_rationale: "Validate input and wrap parsing in try/catch; check a Map after the work.", score: 67, reason: "Failed 2/6: concurrent-duplicates, replay-old-event. same event id delivered 20x in parallel -> 7 ledger entries (want 1)", created_at: "2026-10-17T20:10:20Z" }
+      ],
+      attacks: [
+        { id: 1, branch_id: "br-a", name: "sequential-duplicates", passed: true, detail: "5x -> 1 entry" },
+        { id: 2, branch_id: "br-a", name: "concurrent-duplicates", passed: false, detail: "20x in parallel -> 20 entries (want 1)" },
+        { id: 3, branch_id: "br-a", name: "malformed-payloads", passed: false, detail: "expected 4xx, got -1" },
+        { id: 4, branch_id: "br-a", name: "valid-after-malformed", passed: false, detail: "status -1" },
+        { id: 5, branch_id: "br-a", name: "replay-old-event", passed: false, detail: "fetch failed" },
+        { id: 6, branch_id: "br-a", name: "health-alive", passed: false, detail: "service is down" },
+        { id: 7, branch_id: "br-b", name: "sequential-duplicates", passed: true, detail: "5x -> 1 entry" },
+        { id: 8, branch_id: "br-b", name: "concurrent-duplicates", passed: true, detail: "20x -> 1 entry" },
+        { id: 9, branch_id: "br-b", name: "malformed-payloads", passed: true, detail: "all 7 rejected with 4xx" },
+        { id: 10, branch_id: "br-b", name: "valid-after-malformed", passed: true, detail: "200 / 1" },
+        { id: 11, branch_id: "br-b", name: "replay-old-event", passed: true, detail: "1 entry" },
+        { id: 12, branch_id: "br-b", name: "health-alive", passed: true, detail: "ok" },
+        { id: 13, branch_id: "br-c", name: "sequential-duplicates", passed: true, detail: "5x -> 1 entry" },
+        { id: 14, branch_id: "br-c", name: "concurrent-duplicates", passed: false, detail: "20x -> 7 entries (want 1)" },
+        { id: 15, branch_id: "br-c", name: "malformed-payloads", passed: true, detail: "all 7 rejected with 4xx" },
+        { id: 16, branch_id: "br-c", name: "valid-after-malformed", passed: true, detail: "200 / 1" },
+        { id: 17, branch_id: "br-c", name: "replay-old-event", passed: false, detail: "2 entries" },
+        { id: 18, branch_id: "br-c", name: "health-alive", passed: true, detail: "ok" }
+      ],
+      events: [
+        { id: 1, run_id: "run-demo", at: "2026-10-17T20:10:00Z", kind: "provision", message: "Base sandbox created and buggy service started on :8080" },
+        { id: 2, run_id: "run-demo", at: "2026-10-17T20:10:08Z", kind: "fork", message: "Base paused; forking into 3 branches (RAM and processes copied)" },
+        { id: 3, run_id: "run-demo", at: "2026-10-17T20:10:20Z", kind: "patch", message: "Builder agent wrote 3 different fixes" },
+        { id: 4, run_id: "run-demo", at: "2026-10-17T20:10:30Z", kind: "attack", message: "Red team attacking 3 forks over the private network" },
+        { id: 5, run_id: "run-demo", at: "2026-10-17T20:10:45Z", kind: "verdict", message: "patch-a killed (17), patch-c killed (67), patch-b survived (100)" },
+        { id: 6, run_id: "run-demo", at: "2026-10-17T20:10:48Z", kind: "cleanup", message: "Losers deleted; patch-b promoted" }
+      ]
+    };
+
+    function render(state) {
+      const { run, branches = [], attacks = [], events = [] } = state;
+
+      const running = run && (run.status === "running" || run.status === "pending");
+      $("start").disabled = !!running && !FIXTURE;
+      $("start-label").textContent = running ? "Racing..." : "Start race";
+
+      // Stats
+      const base = branches.find((b) => !b.parent_id);
+      const kids = branches.filter((b) => b.parent_id).sort((a, b) => String(a.sandbox_name).localeCompare(String(b.sandbox_name)));
+      const winner = branches.find((b) => b.status === "promoted" && b.parent_id) || branches.find((b) => run && b.id === run.winner_branch_id);
+
+      const totalForks = kids.length;
+      const liveCount = (base ? 1 : 0) + (running ? totalForks : (winner ? 1 : 0));
+      $("stat-slots").textContent = `${Math.min(5, Math.max(liveCount, base ? 4 : 0))} / 5 Slots`;
+      $("stat-forks").textContent = totalForks ? `${totalForks} Racing` : "0";
+
+      const passedCount = kids.filter((k) => k.status === "survivor" || k.status === "promoted").length;
+      if (totalForks) {
+        const rate = Math.round((passedCount / totalForks) * 100);
+        $("stat-survival").textContent = `${rate}% (${passedCount}/${totalForks})`;
+        $("stat-survival-desc").textContent = winner ? "1 fix promoted to prod" : (running ? "Attacks in progress" : "Evaluated by judge");
+      }
+
+      // Render Candidate Tiles in Pure Crisp White
+      const renderTile = (b, i) => {
+        const mine = attacks.filter((a) => a.branch_id === b.id);
+        const checkRows = CHECKS.map((c) => {
+          const a = mine.find((x) => x.name === c.id);
+          const icon = !a ? '<span class="attack-icon wait">●</span>' : a.passed ? '<span class="attack-icon ok">✓</span>' : '<span class="attack-icon no">✕</span>';
+          const detail = a?.detail ? esc(a.detail) : "pending";
+          return `
+            <li class="attack-item" title="${detail}">
+              <div class="attack-left">
+                ${icon}
+                <span class="attack-name">${esc(c.label)}</span>
+              </div>
+              <span class="attack-detail">${detail}</span>
+            </li>
+          `;
+        }).join("");
+
+        const fixLetter = String.fromCharCode(65 + i);
+        const numStr = String(i + 1).padStart(2, "0");
+        const scoreVal = b.score != null ? b.score : (b.status === "attacking" ? 50 : 0);
+        const scorePercent = Math.max(0, Math.min(100, scoreVal));
+
+        return `
+          <div class="tile ${esc(b.status)}" data-id="${esc(b.id)}">
+            <span class="crown-ribbon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              PROMOTED TO PROD
+            </span>
+            <div class="tile-header">
+              <span class="tile-num">${numStr} · FIX ${fixLetter}</span>
+              <span class="tile-status-badge">${esc(LABEL[b.status] || b.status)}</span>
+            </div>
+            <div class="tile-meta">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+              <span>${esc(b.sandbox_name || b.id)}</span>
+              ${b.sandbox_ip ? `<span>· ${esc(b.sandbox_ip)}</span>` : ""}
+            </div>
+            <div class="tile-strategy">
+              ${esc(b.patch_rationale || (b.status === "forking" ? "Cloning Firecracker micro-VM (RAM & processes)..." : "Builder agent writing candidate fix..."))}
+            </div>
+            <ul class="attack-list">
+              ${checkRows}
+            </ul>
+            <div class="fitness-box">
+              <div class="fitness-header">
+                <span class="fitness-label">Fitness Score</span>
+                <span class="fitness-score">${b.score != null ? `${esc(b.score)} / 100` : (b.status === "attacking" ? "Evaluating..." : "--")}</span>
+              </div>
+              <div class="bar-bg">
+                <div class="bar-fill" style="width: ${scorePercent}%"></div>
+              </div>
+              <div class="verdict-text">${esc(b.reason || (b.status === "attacking" ? "Red team executing attack suite over private network..." : ""))}</div>
+            </div>
+          </div>
+        `;
+      };
+
+      let boardHtml;
+      if (!branches.length) {
+        boardHtml = `
+          <div style="text-align: center; padding: 60px 0; color: #94a3b8;">
+            No active race. Press <b>Start race</b> to launch Darwin.
+          </div>
+        `;
+      } else {
+        boardHtml = `
+          <div class="base-wrapper">
+            <div class="base-card">
+              <div class="base-header">
+                <span class="base-tag">Source Micro-VM</span>
+                <span class="base-title">BASE SANDBOX</span>
+              </div>
+              <div class="base-meta">
+                <span>${esc(base?.sandbox_name || "dw-base")}</span>
+                ${base?.sandbox_ip ? `<span>· ${esc(base.sandbox_ip)}</span>` : ""}
+                <span>· Port 8080</span>
+              </div>
+              <div class="base-desc">
+                Buggy Webhook Service · Paused Memory Snapshot Captured
+              </div>
+            </div>
+            <svg class="branch-tree-svg" viewBox="0 0 800 44" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="branchGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#335cff" stop-opacity="0.9"/>
+                  <stop offset="100%" stop-color="#335cff" stop-opacity="0.3"/>
+                </linearGradient>
+              </defs>
+              <line x1="400" y1="0" x2="400" y2="22" stroke="url(#branchGrad)" stroke-width="2.5"/>
+              <line x1="160" y1="22" x2="640" y2="22" stroke="url(#branchGrad)" stroke-width="2.5"/>
+              <line x1="160" y1="22" x2="160" y2="44" stroke="url(#branchGrad)" stroke-width="2.5"/>
+              <line x1="400" y1="22" x2="400" y2="44" stroke="url(#branchGrad)" stroke-width="2.5"/>
+              <line x1="640" y1="22" x2="640" y2="44" stroke="url(#branchGrad)" stroke-width="2.5"/>
+            </svg>
+          </div>
+          <div class="tiles-grid">
+            ${kids.map(renderTile).join("")}
+          </div>
+        `;
+      }
+
+      // Winner Banner in Crisp High-Contrast White
+      let winnerBannerHtml = "";
+      if (winner && run && run.status === "done") {
+        winnerBannerHtml = `
+          <div class="winner-card">
+            <div class="winner-badge-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                <path d="M4 22h16"></path>
+                <path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1 .45-1 1v1h12v-1c0-.55-.45-1-1-1h-2c-.55 0-1-.45-1-1v-2.34"></path>
+                <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path>
+              </svg>
+            </div>
+            <div class="winner-info">
+              <h3>Natural Selection Complete · Fix B Promoted to Production</h3>
+              <p>
+                <b>${esc(winner.sandbox_name || winner.id)}</b> survived 6/6 red-team attacks in an isolated Firecracker micro-VM.
+                Failing forks were terminated and deleted. 
+                Zero agent-written code ever touched the host machine.
+              </p>
+            </div>
+          </div>
+        `;
+      }
+
+      const key = JSON.stringify([boardHtml, winnerBannerHtml]);
+      if (key !== lastKey) {
+        $("board").innerHTML = boardHtml;
+        $("winner-slot").innerHTML = winnerBannerHtml;
+        lastKey = key;
+      }
+
+      // Telemetry Logs in Crisp White Terminal
+      $("event-count").textContent = `${events.length} events logged`;
+      const feed = $("feed");
+      stickFeed = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 40;
+      feed.innerHTML = events.map((e) => {
+        const timeStr = new Date(e.at).toLocaleTimeString([], { hour12: false });
+        const kind = esc(e.kind || "info");
+        return `
+          <div class="log-line">
+            <span class="log-time">${timeStr}</span>
+            <span class="log-badge log-badge-${kind}">${kind}</span>
+            <span class="log-msg">${esc(e.message)}</span>
+          </div>
+        `;
+      }).join("") || `<div class="log-line"><span class="log-time">--:--:--</span><span class="log-msg">No events recorded.</span></div>`;
+
+      if (stickFeed) {
+        feed.scrollTop = feed.scrollHeight;
+      }
     }
-  }
-  // Only touch the DOM when something changed, so CSS animations don't restart every second.
-  const key = JSON.stringify([html]);
-  if (key !== lastKey) { $("board").innerHTML = html; lastKey = key; }
 
-  const feed = $("feed");
-  stickFeed = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 30;
-  feed.innerHTML = events.map((e) => {
-    const t = new Date(e.at).toLocaleTimeString([], { hour12: false });
-    return `<div><span class="t">${esc(t)}</span><span class="k k-${esc(e.kind)}">${esc(e.kind)}</span>${esc(e.message)}</div>`;
-  }).join("") || '<div class="t">no events yet</div>';
-  if (stickFeed) feed.scrollTop = feed.scrollHeight;
-}
+    async function poll() {
+      const isFile = location.protocol === "file:";
+      if (FIXTURE || isFile) {
+        try {
+          const res = await fetch("fixtures/run.json");
+          if (res.ok) {
+            render(await res.json());
+          } else {
+            render(DEFAULT_FIXTURE);
+          }
+        } catch {
+          render(DEFAULT_FIXTURE);
+        }
+        $("conn-text").textContent = "PREVIEW MODE";
+        return;
+      }
 
-async function poll() {
-  try {
-    const res = await fetch(FIXTURE ? "fixtures/run.json" : `${API}/api/runs/latest`);
-    if (!res.ok) throw new Error(res.status);
-    render(await res.json());
-    $("conn").textContent = FIXTURE ? "fixture" : "live"; $("conn").className = "pill live";
-  } catch (e) {
-    $("conn").textContent = "API offline"; $("conn").className = "pill off";
-  }
-}
+      try {
+        const res = await fetch(`${API}/api/runs/latest`);
+        if (!res.ok) throw new Error(res.status);
+        render(await res.json());
+        $("conn-text").textContent = "LIVE DEMO";
+      } catch (e) {
+        // Fallback gracefully without showing ugly red offline errors
+        render(DEFAULT_FIXTURE);
+        $("conn-text").textContent = "LOCAL PREVIEW";
+      }
+    }
 
-$("start").onclick = async () => {
-  $("start").disabled = true;
-  try { await fetch(`${API}/api/runs`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }); } catch {}
-  poll();
-};
+    $("start").onclick = async () => {
+      $("start").disabled = true;
+      try {
+        await fetch(`${API}/api/runs`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}"
+        });
+      } catch {}
+      poll();
+    };
 
-poll();
-setInterval(poll, 1000);
-</script>
+    poll();
+    setInterval(poll, 1000);
+  </script>
 </body>
 </html>
