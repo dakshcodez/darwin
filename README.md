@@ -6,7 +6,7 @@ Coding agents write fixes fast, but you can't trust any single patch and you sho
 
 Built for the **CreateOS × Stripe Projects "Build Agents That Run Code" hackathon**. The whole stack is provisioned with **Stripe Projects**, and every line of agent-written code runs inside the **CreateOS Sandbox**, never on the host.
 
-> **Live:** https://darwin-tr7p.onrender.com (browse freely; starting a race needs an access token, see Deploying) · **Links:** demo video: _add YouTube link_ · post: _add X / LinkedIn link_ · leaderboard: projects.dev/leaderboard (code `CreateOS-2026`)
+> **Live:** https://darwin-tr7p.onrender.com (browse freely; starting a race needs an access token, see Deploying) · **Links:** demo video: _add YouTube link_ · post: [on X](https://x.com/dakshcodez/status/2111599754954391560) · leaderboard: [vote for darwin](https://projects.dev/vote/darwin)
 
 ---
 
