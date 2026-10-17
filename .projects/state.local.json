@@ -1,0 +1,111 @@
+{
+  "version": 4,
+  "project": {
+    "catalog": "prod",
+    "initializedAt": "2026-10-17T19:23:06.448Z",
+    "merchantDisplayName": null,
+    "merchantId": "acct_1URbzqFhgRmWZUYv",
+    "projectId": "project_61Vb19WLwUhlM2YXG16VazxCKTSQ06r6lrsRQsSnI5yC",
+    "projectName": "darwin"
+  },
+  "providers": {
+    "createos": {
+      "accountRequestId": "facctrq_61Vb1AK4bODLqc0ag16VazxCKTSQ06r6lrsRQsSnIF6u",
+      "configuration": {},
+      "linkedAt": "2026-10-17T19:23:57.991Z",
+      "providerId": "prvdr_61V0eGC6sUPXoATb051se",
+      "providerName": "createos",
+      "redirectUrl": null,
+      "requestedAt": "2026-10-17T19:23:57.991Z",
+      "status": "complete"
+    },
+    "neon": {
+      "accountRequestId": "facctrq_61Vb1B9CQLrhQskZ616VazxCKTSQ06r6lrsRQsSnIIxE",
+      "configuration": {},
+      "linkedAt": "2026-10-17T19:24:48.791Z",
+      "providerId": "prvdr_61UH8uNXFdoJUJOtT54AC",
+      "providerName": "Neon",
+      "redirectUrl": null,
+      "requestedAt": "2026-10-17T19:24:48.791Z",
+      "status": "complete"
+    },
+    "openrouter": {
+      "accountRequestId": "facctrq_61Vb1AvEFto4ZNW7J16VazxCKTSQ06r6lrsRQsSnIViC",
+      "configuration": {},
+      "linkedAt": "2026-10-17T19:24:34.296Z",
+      "providerId": "prvdr_61URImmFACEuDHEx651IO",
+      "providerName": "OpenRouter",
+      "redirectUrl": null,
+      "requestedAt": "2026-10-17T19:24:34.296Z",
+      "status": "complete"
+    }
+  },
+  "resources": {
+    "createos-plan": {
+      "configuration": {},
+      "createdAt": "2026-10-17T19:23:59.757Z",
+      "lastRevealedAt": "2026-10-17T19:24:00.294Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "createos-plan",
+      "providerId": "prvdr_61V0eGC6sUPXoATb051se",
+      "providerName": "createos",
+      "resourceId": "fres_61Vb1AMIc7EJqLo1E16VazxCKTSQ06r6lrsRQsSnIJK4",
+      "serviceId": "free"
+    },
+    "createos-project": {
+      "configuration": {},
+      "createdAt": "2026-10-17T19:24:07.529Z",
+      "lastRevealedAt": "2026-10-17T19:24:08.072Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "createos-project",
+      "providerId": "prvdr_61V0eGC6sUPXoATb051se",
+      "providerName": "createos",
+      "resourceId": "fres_61Vb1AUMX43eNMKq616VazxCKTSQ06r6lrsRQsSnIKmu",
+      "serviceId": "project"
+    },
+    "neon-plan": {
+      "configuration": {},
+      "createdAt": "2026-10-17T19:24:50.590Z",
+      "lastRevealedAt": "2026-10-17T19:24:51.370Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "neon-plan",
+      "providerId": "prvdr_61UH8uNXFdoJUJOtT54AC",
+      "providerName": "Neon",
+      "resourceId": "fres_61Vb1BBWrAspvFkgq16VazxCKTSQ06r6lrsRQsSnI4xs",
+      "serviceId": "free"
+    },
+    "neon-postgres": {
+      "configuration": {},
+      "createdAt": "2026-10-17T19:24:55.418Z",
+      "lastRevealedAt": "2026-10-17T19:24:56.065Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "neon-postgres",
+      "providerId": "prvdr_61UH8uNXFdoJUJOtT54AC",
+      "providerName": "Neon",
+      "resourceId": "fres_61Vb1BGztW2nKHuRg16VazxCKTSQ06r6lrsRQsSnIQwa",
+      "serviceId": "postgres"
+    },
+    "openrouter-api": {
+      "configuration": {},
+      "createdAt": "2026-10-17T19:24:37.043Z",
+      "lastRevealedAt": "2026-10-17T19:24:37.640Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "openrouter-api",
+      "providerId": "prvdr_61URImmFACEuDHEx651IO",
+      "providerName": "OpenRouter",
+      "resourceId": "fres_61Vb1AxVJ94Ir75dE16VazxCKTSQ06r6lrsRQsSnI3Yu",
+      "serviceId": "api"
+    }
+  },
+  "managedProjectVariableEnvKeys": {
+    ".env": [
+      "CREATEOS_SANDBOX_BASE_URL",
+      "CREATEOS_SANDBOX_URL"
+    ]
+  }
+}
