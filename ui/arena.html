@@ -926,14 +926,31 @@
       startLabel.textContent = busy ? "Racing..." : "Start Race";
     }
 
-    async function startRace() {
+    // Starting a race spends sandboxes and LLM quota, so a hosted server asks for an access token. The token is kept
+    // only for this browser tab (sessionStorage) and sent as a header.
+    async function startRace(retried) {
       setBusy(true);
       try {
+        const token = sessionStorage.getItem("darwinToken");
         const res = await fetch("/api/runs", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(token ? { "x-darwin-token": token } : {}) },
           body: JSON.stringify({ n: 3, example: targetSelect.value })
         });
+        if (res.status === 401) {
+          sessionStorage.removeItem("darwinToken");
+          const t = retried ? null : window.prompt("An access token is required to start a race:");
+          if (t && t.trim()) { sessionStorage.setItem("darwinToken", t.trim()); return startRace(true); }
+          connText("Access token required");
+          setBusy(false);
+          return;
+        }
+        if (res.status === 429 || res.status === 503) {
+          const j = await res.json().catch(() => ({}));
+          connText(j.error || "Cannot start a race right now");
+          setBusy(false);
+          return;
+        }
         if (!res.ok && res.status !== 409) throw new Error("HTTP " + res.status);
       } catch (e) {
         // never fake a race: say the orchestrator could not be reached
@@ -941,7 +958,7 @@
         setBusy(false);
       }
     }
-    startBtn.addEventListener("click", startRace);
+    startBtn.addEventListener("click", () => startRace(false));
 
     function escapeHtml(v) {
       return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
