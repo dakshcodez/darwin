@@ -1,0 +1,39 @@
+# Render Blueprint for Darwin: one always-single web service that serves the API, the landing page and /arena.
+# Secrets are marked `sync: false`: Render asks for them (or you set them with the CLI). Never put values in this file.
+services:
+  - type: web
+    name: darwin
+    runtime: node
+    plan: free            # free instances sleep when idle; use "starter" to keep it awake
+    region: oregon
+    numInstances: 1       # the server keeps "a race is running" in memory, so it must be a single instance
+    buildCommand: npm ci --include=dev
+    startCommand: npx tsx orchestrator/server.ts
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DARWIN_AGENTS
+        value: real
+      - key: DARWIN_MIN_INTERVAL_SEC   # minimum seconds between race starts
+        value: "240"
+      - key: CREATEOS_SANDBOX_URL
+        value: https://api.sb.createos.sh
+      - key: CREATEOS_SANDBOX_BASE_URL
+        value: https://api.sb.createos.sh
+      - key: DARWIN_MODEL
+        value: gemini-3.8-flash
+      - key: DARWIN_MODELS
+        value: gemini-3.8-flash,gemini-flash-latest,gemini-3-flash-preview,gemini-3.6-flash,gemini-3.5-flash,gemini-3.7-flash
+      - key: OPENROUTER_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      # secrets
+      - key: DARWIN_ADMIN_TOKEN        # required to start a race from the arena
+        sync: false
+      - key: CREATEOS_PROJECT_API_KEY
+        sync: false
+      - key: NEON_POSTGRES_CONNECTION_STRING
+        sync: false
+      - key: OPENROUTER_API_KEY        # holds the LLM key (a Google AI Studio key when using Gemini)
+        sync: false
