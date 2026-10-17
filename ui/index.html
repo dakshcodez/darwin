@@ -1430,10 +1430,16 @@
       startLabel.textContent = "Racing...";
 
       try {
-        await fetch("/api/run/start", { method: "POST" });
+        // POST /api/runs starts a real race (the orchestrator creates sandboxes); 409 means one is already running
+        const r = await fetch("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+        if (!r.ok && r.status !== 409) throw new Error(`orchestrator answered ${r.status}`);
       } catch (e) {
-        console.warn("Using simulated client-side race progression:", e);
-        simulateLocalRace();
+        // Never fake a race: if the orchestrator cannot be reached, say so.
+        console.warn("Could not start a race:", e);
+        document.getElementById("conn-text").textContent = "ORCHESTRATOR UNREACHABLE";
+        startBtn.disabled = false;
+        if (heroStartBtn) heroStartBtn.disabled = false;
+        startLabel.textContent = "Start race";
       }
     }
 
@@ -1625,7 +1631,7 @@
     // Polling from backend
     async function pollState() {
       try {
-        const res = await fetch("/api/run/current");
+        const res = await fetch("/api/runs/latest");
         if (res.ok) {
           const data = await res.json();
           renderState(data);
@@ -1635,7 +1641,9 @@
       } catch (e) {
         // Fallback to fixture
       }
+      // Orchestrator not reachable: show the bundled sample run, clearly labelled as such.
       renderState(DEFAULT_FIXTURE);
+      document.getElementById("conn-text").textContent = "PREVIEW · SAMPLE DATA";
     }
 
     // Initial render
