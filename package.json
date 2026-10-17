@@ -1,0 +1,29 @@
+{
+  "name": "darwin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Darwin: natural selection for agent-written code. Forked CreateOS sandboxes, a red team, and only the fittest fix survives.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "db:apply": "tsx infra/apply-schema.ts",
+    "doctor": "tsx infra/doctor.ts",
+    "dev": "tsx orchestrator/server.ts"
+  },
+  "dependencies": {
+    "@nodeops-createos/sandbox": "^0.8.2",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
