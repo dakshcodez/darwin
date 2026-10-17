@@ -1,0 +1,5 @@
+{
+  "name": "slugify",
+  "bug": "slugify() only lowercases and replaces single spaces. It must also trim and collapse whitespace and repeated separators, strip accents (Crème Brûlée -> creme-brulee), drop punctuation and symbols between words, and never return leading or trailing dashes.",
+  "test": "npm test"
+}
