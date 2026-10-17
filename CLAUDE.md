@@ -379,6 +379,8 @@ README architecture section, the CreateOS and Stripe Projects usage write-up, th
 
 ### PART B: Demo service, Agents and UI
 
+> **Test your agents without any sandbox:** once `agents/index.ts` exports `generatePatches`, `getAttackScript` and `judge`, run `npm run check:agents` (optionally `DARWIN_N=3`). It starts each patched service on localhost, runs your attack script against it, and prints the verdicts. This costs no CreateOS quota (the account has a limited daily sandbox budget, see 3.2a). Aim for exactly 1 survivor out of 3. The orchestrator loads your module with `DARWIN_AGENTS=real npm run race` only when the team agrees a live run is worth the budget. The service in `/service` must start with `npm start` and read `PORT`.
+
 **B1. Demo service (12:30-1:15)**
 Build `/service` per section 6: Express, `npm start` on 8080, the interface in section 5. Include the deliberate bug and a `README` note about it. Add `/service/test/` with a simple script that proves the bug locally (double ledger entries). Commit by **M1** (1:45) so A can use it.
 
