@@ -105,6 +105,7 @@ app.post("/api/runs", async (req, res) => {
 
 app.use(express.static(path.join(cfg.rootDir, "ui")));
 app.get("/", (_req, res) => res.sendFile(path.join(cfg.rootDir, "ui", "index.html")));
+app.get("/arena", (_req, res) => res.sendFile(path.join(cfg.rootDir, "ui", "arena.html")));
 
 const server = app.listen(cfg.port, () => console.log(`darwin orchestrator API on http://localhost:${cfg.port}`));
 process.on("SIGINT", () => { server.close(); void db.close().finally(() => process.exit(0)); });
