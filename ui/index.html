@@ -675,7 +675,15 @@
     .footer-links a:hover {
       color: #ffffff;
     }
-  </style>
+  
+    /* ---- responsive: nothing may make the page wider than the screen ---- */
+    html, body { max-width: 100%; overflow-x: clip; }
+    @media (max-width: 520px) {
+      .nav-inner { gap: 10px; }
+      .brand-badge { display: none; }
+      .btn-nav-arena { padding: 0 14px; font-size: 13px; }
+    }
+</style>
 </head>
 <body>
   <!-- Top Announcement Bar -->

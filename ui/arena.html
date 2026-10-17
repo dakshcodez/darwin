@@ -701,6 +701,28 @@
     .card-diff .d-del { color: #f87171; }
     .card-diff .d-hunk { color: #7dd3fc; }
     .empty-state { padding: 64px 24px; text-align: center; color: var(--color-ink-muted); font-size: 15px; }
+
+    /* ---- responsive: nothing may make the page wider than the screen ---- */
+    html, body { max-width: 100%; overflow-x: clip; }
+    .log-msg, .attack-detail, .card-strategy, .card-verdict, .card-idx, .winner-desc, .arena-headline-box p { overflow-wrap: anywhere; min-width: 0; }
+    .attack-item { flex-wrap: wrap; gap: 2px 12px; }
+    .card-top { flex-wrap: wrap; gap: 6px 10px; }
+    .nav-left, .nav-right { min-width: 0; }
+    .status-pill { max-width: 100%; min-width: 0; }
+    .status-pill #conn-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 980px) {
+      .nav-inner { height: auto; flex-wrap: wrap; padding: 10px 0; row-gap: 10px; }
+      .nav-right { flex-wrap: wrap; width: 100%; gap: 10px; }
+      .target-select { flex: 1 1 200px; min-width: 0; max-width: 100%; }
+      .btn-race { flex: 0 0 auto; }
+    }
+    @media (max-width: 600px) {
+      .back-link span, .brand-tag { display: none; }
+      .arena-headline-box h1 { font-size: 22px; }
+      .arena-meta-stats { gap: 10px; width: 100%; }
+      .meta-stat-item { min-width: 0; flex: 1 1 40%; }
+      .nav-right .status-pill { order: 3; width: 100%; }
+    }
 </style>
 </head>
 <body>
