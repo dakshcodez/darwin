@@ -1,172 +1,1437 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Darwin: fork, attack, promote</title>
-<style>
-  :root {
-    --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e;
-    --amber: #d29922; --red: #f85149; --green: #3fb950; --blue: #58a6ff;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
-  header { display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  h1 { margin: 0; font-size: 20px; letter-spacing: .5px; }
-  h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
-  .spacer { flex: 1; }
-  .pill { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-  .pill.live { color: var(--green); border-color: var(--green); }
-  .pill.off { color: var(--red); border-color: var(--red); }
-  button { background: var(--green); color: #04130a; border: 0; padding: 8px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
-  .base { margin: 0 auto; width: 280px; text-align: center; border: 1px solid var(--blue); border-radius: 10px; padding: 12px; background: var(--panel); }
-  .base b { color: var(--blue); }
-  .base .sub { color: var(--muted); font-size: 12px; }
-  .stem { width: 2px; height: 24px; background: var(--line); margin: 0 auto; }
-  .bar { height: 2px; background: var(--line); margin: 0 auto; width: 66%; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 0; }
-  .tile { position: relative; background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 14px; transition: border-color .4s, box-shadow .4s, opacity .6s, filter .6s; animation: pop .5s ease-out; overflow: hidden; }
-  .tile::before { content: ""; position: absolute; left: 50%; top: -18px; width: 2px; height: 18px; background: var(--line); }
-  @keyframes pop { from { transform: translateY(-14px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
-  .tile.forking, .tile.patching { border-color: var(--blue); }
-  .tile.attacking { border-color: var(--amber); animation: pulse 1.2s infinite; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(210,153,34,.45); } 50% { box-shadow: 0 0 14px 2px rgba(210,153,34,.45); } }
-  .tile.killed { border-color: var(--red); opacity: .6; filter: grayscale(.6); animation: pop .5s, shake .5s .0s; }
-  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
-  .tile.killed .title::after { content: " \2715"; color: var(--red); }
-  .tile.survivor { border-color: var(--green); }
-  .tile.promoted { border-color: var(--green); box-shadow: 0 0 22px 2px rgba(63,185,80,.5); }
-  .tile.error { border-color: var(--red); border-style: dashed; }
-  .title { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
-  .badge { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; padding: 2px 8px; border-radius: 4px; background: var(--line); color: var(--text); }
-  .forking .badge, .patching .badge { background: var(--blue); color: #021; }
-  .attacking .badge { background: var(--amber); color: #210; }
-  .killed .badge, .error .badge { background: var(--red); color: #200; }
-  .survivor .badge, .promoted .badge { background: var(--green); color: #021; }
-  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  .why { margin: 10px 0; min-height: 40px; }
-  .checks { list-style: none; padding: 0; margin: 0 0 8px; }
-  .checks li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; padding: 1px 0; }
-  .ok { color: var(--green); } .no { color: var(--red); } .wait { color: var(--muted); }
-  .score { font-size: 28px; font-weight: 700; }
-  .reason { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-word; }
-  .crown { display: none; position: absolute; top: 8px; right: 12px; font-size: 11px; background: var(--green); color: #021; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
-  .promoted .crown { display: block; }
-  .promoted .badge { visibility: hidden; }
-  .banner { margin: 20px auto 0; padding: 12px 18px; border-radius: 8px; background: rgba(63,185,80,.12); border: 1px solid var(--green); color: var(--green); text-align: center; font-weight: 600; animation: pop .6s; }
-  .empty { text-align: center; color: var(--muted); padding: 60px 0; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 28px 0 8px; }
-  .feed { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-height: 260px; overflow-y: auto; padding: 8px 12px; font: 12.5px/1.6 ui-monospace, Consolas, monospace; }
-  .feed div { white-space: pre-wrap; }
-  .k { display: inline-block; min-width: 68px; text-transform: uppercase; font-size: 11px; }
-  .k-provision { color: var(--blue); } .k-fork { color: #a371f7; } .k-patch { color: var(--blue); } .k-attack { color: var(--amber); }
-  .k-verdict { color: var(--green); } .k-cleanup { color: var(--muted); } .k-error { color: var(--red); } .k-info { color: var(--muted); }
-  .t { color: var(--muted); margin-right: 6px; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Darwin · CreateOS × Stripe Projects</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07080c;
+      --panel: rgba(18, 22, 34, 0.65);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --panel-border-hover: rgba(255, 255, 255, 0.16);
+      --text: #f0f3f8;
+      --text-muted: #8c96a8;
+      --text-subtle: #525a6b;
+      --vf-blue: #335cff;
+      --vf-blue-light: #6085ff;
+      --vf-blue-glow: rgba(51, 92, 255, 0.28);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.35);
+      --amber: #f59e0b;
+      --amber-glow: rgba(245, 158, 11, 0.35);
+      --crimson: #ef4444;
+      --crimson-glow: rgba(239, 68, 68, 0.35);
+      --purple: #a855f7;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* CreateOS signature grid & radial lighting */
+    .hk-grid {
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: radial-gradient(ellipse 80% 65% at 50% 12%, #000 35%, transparent 85%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 65% at 50% 12%, #000 35%, transparent 85%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hk-ambient-top {
+      position: fixed;
+      top: -240px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 580px;
+      background: radial-gradient(circle, rgba(51, 92, 255, 0.16) 0%, rgba(51, 92, 255, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hk-ambient-winner {
+      position: fixed;
+      bottom: -150px;
+      right: 10%;
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+      transition: opacity 1s ease;
+      opacity: 0;
+    }
+    .hk-ambient-winner.active { opacity: 1; }
+
+    /* Sticky Navigation */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 32px;
+      background: rgba(7, 8, 12, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--panel-border);
+      flex-wrap: wrap;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .logo-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #335cff 0%, #1e3a8a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(51, 92, 255, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-cross {
+      color: var(--text-subtle);
+      font-weight: 300;
+      font-size: 15px;
+    }
+
+    .brand-stripe {
+      color: #7987ff;
+      font-weight: 600;
+    }
+
+    .brand-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Toggle pill modeled after CreateOS "Human / Agent" mode */
+    .view-toggle {
+      position: relative;
+      display: inline-flex;
+      height: 34px;
+      align-items: center;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 2px;
+    }
+
+    .view-toggle button {
+      background: transparent;
+      border: 0;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .view-toggle button.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+
+    /* Status Pills */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.03em;
+      border: 1px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+    }
+
+    .pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-subtle);
+    }
+
+    .pill.live {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.08);
+      color: #34d399;
+    }
+    .pill.live .pill-dot {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse-dot 2s infinite;
+    }
+
+    .pill.fixture {
+      border-color: rgba(51, 92, 255, 0.35);
+      background: rgba(51, 92, 255, 0.08);
+      color: var(--vf-blue-light);
+    }
+    .pill.fixture .pill-dot {
+      background: var(--vf-blue);
+      box-shadow: 0 0 8px var(--vf-blue);
+    }
+
+    .pill.off {
+      border-color: rgba(239, 68, 68, 0.3);
+      background: rgba(239, 68, 68, 0.08);
+      color: #f87171;
+    }
+    .pill.off .pill-dot { background: var(--crimson); }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Primary Start Button (CreateOS Hero Button Style) */
+    .btn-start {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      color: #07080c;
+      border: 0;
+      padding: 8px 20px;
+      border-radius: var(--radius-full);
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-start:hover:not(:disabled) {
+      background: #f1f3f7;
+      transform: translateY(-1px) scale(1.02);
+      box-shadow: 0 0 28px rgba(51, 92, 255, 0.5);
+    }
+
+    .btn-start:active:not(:disabled) {
+      transform: translateY(1px) scale(0.98);
+    }
+
+    .btn-start:disabled {
+      background: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.5);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-icon {
+      transition: transform 0.25s ease;
+    }
+    .btn-start:hover:not(:disabled) .btn-icon {
+      transform: translateX(3px);
+    }
+
+    /* Main Container */
+    main {
+      position: relative;
+      z-index: 10;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 36px 28px 80px;
+    }
+
+    /* Hero / Metrics Ribbon */
+    .hero-section {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 14px;
+      border-radius: var(--radius-full);
+      background: rgba(51, 92, 255, 0.08);
+      border: 1px solid rgba(51, 92, 255, 0.25);
+      color: var(--vf-blue-light);
+      font-size: 12.5px;
+      font-weight: 500;
+      margin-bottom: 16px;
+    }
+
+    .hero-title {
+      font-size: clamp(2rem, 4.5vw, 3.25rem);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.1;
+      margin-bottom: 14px;
+      color: #ffffff;
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #6085ff 0%, #335cff 50%, #93c5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      max-width: 680px;
+      margin: 0 auto 32px;
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Stat Cards Ribbon */
+    .stats-ribbon {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 48px;
+    }
+
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      display: flex;
+      flex-col;
+      gap: 4px;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .stat-card:hover {
+      border-color: var(--panel-border-hover);
+      transform: translateY(-2px);
+    }
+
+    .stat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-subtle);
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .stat-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Sandbox Hierarchy & Canvas */
+    .canvas-section {
+      position: relative;
+      margin-bottom: 48px;
+    }
+
+    /* Base Sandbox Card */
+    .base-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .base-card {
+      width: 380px;
+      max-width: 90vw;
+      background: rgba(18, 22, 34, 0.85);
+      border: 1px solid rgba(51, 92, 255, 0.4);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      box-shadow: 0 0 35px -5px rgba(51, 92, 255, 0.25);
+      backdrop-filter: blur(16px);
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .base-card:hover {
+      box-shadow: 0 0 45px rgba(51, 92, 255, 0.35);
+      border-color: var(--vf-blue);
+    }
+
+    .base-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .base-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(51, 92, 255, 0.15);
+      color: var(--vf-blue-light);
+      border: 1px solid rgba(51, 92, 255, 0.3);
+    }
+
+    .base-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .base-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .base-desc {
+      font-size: 12px;
+      color: #cbd5e1;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 6px;
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Branch Connector Graphic */
+    .branch-tree-svg {
+      width: 100%;
+      height: 48px;
+      overflow: visible;
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Tiles Grid */
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+      gap: 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Candidate Tile */
+    .tile {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    .tile:hover {
+      border-color: var(--panel-border-hover);
+      transform: translateY(-3px);
+    }
+
+    /* Status State Variations */
+    .tile.forking, .tile.patching {
+      border-color: rgba(51, 92, 255, 0.45);
+      box-shadow: 0 0 25px rgba(51, 92, 255, 0.15);
+    }
+
+    .tile.attacking {
+      border-color: rgba(245, 158, 11, 0.55);
+      box-shadow: 0 0 35px var(--amber-glow);
+      animation: pulse-border 1.5s infinite alternate;
+    }
+
+    @keyframes pulse-border {
+      0% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.2); }
+      100% { box-shadow: 0 0 35px rgba(245, 158, 11, 0.45); }
+    }
+
+    .tile.killed {
+      border-color: rgba(239, 68, 68, 0.4);
+      background: rgba(20, 15, 20, 0.55);
+      opacity: 0.72;
+      filter: grayscale(0.4);
+      animation: shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-1px, 0, 0); }
+      20%, 80% { transform: translate3d(2px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-3px, 0, 0); }
+      40%, 60% { transform: translate3d(3px, 0, 0); }
+    }
+
+    .tile.survivor {
+      border-color: rgba(16, 185, 129, 0.6);
+      box-shadow: 0 0 40px var(--emerald-glow);
+    }
+
+    .tile.promoted {
+      border-color: #10b981;
+      background: linear-gradient(180deg, rgba(16, 185, 129, 0.09) 0%, rgba(18, 22, 34, 0.8) 100%);
+      box-shadow: 0 0 50px -5px rgba(16, 185, 129, 0.5), inset 0 0 20px rgba(16, 185, 129, 0.15);
+    }
+
+    /* Tile Header */
+    .tile-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tile-identity {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .tile-name {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+    }
+
+    .tile-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+    }
+
+    .tile.forking .tile-badge, .tile.patching .tile-badge {
+      background: rgba(51, 92, 255, 0.15);
+      border-color: rgba(51, 92, 255, 0.35);
+      color: var(--vf-blue-light);
+    }
+
+    .tile.attacking .tile-badge {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
+
+    .tile.killed .tile-badge {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    .tile.survivor .tile-badge, .tile.promoted .tile-badge {
+      background: rgba(16, 185, 129, 0.18);
+      border-color: rgba(16, 185, 129, 0.45);
+      color: #34d399;
+    }
+
+    /* Winner Crown */
+    .crown-banner {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-bottom-left-radius: 10px;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+      display: none;
+      align-items: center;
+      gap: 5px;
+    }
+    .tile.promoted .crown-banner { display: inline-flex; }
+
+    /* Sandbox IP & Metadata */
+    .tile-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Strategy / Rationale */
+    .tile-why {
+      font-size: 13px;
+      color: #d1d5db;
+      line-height: 1.5;
+      background: rgba(0, 0, 0, 0.28);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      border-left: 3px solid var(--vf-blue);
+      min-height: 48px;
+    }
+    .tile.killed .tile-why { border-left-color: var(--crimson); }
+    .tile.promoted .tile-why, .tile.survivor .tile-why { border-left-color: var(--emerald); }
+
+    /* Red Team Attack Suite Checklist */
+    .checks-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12.5px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background 0.15s ease;
+    }
+
+    .check-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .check-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .check-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .check-icon.ok {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .check-icon.no {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .check-icon.wait {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-subtle);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .check-name {
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+    }
+
+    .check-detail {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-subtle);
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Score & Fitness Bar */
+    .fitness-section {
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .fitness-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .fitness-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-subtle);
+    }
+
+    .score-badge {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .tile.promoted .score-badge, .tile.survivor .score-badge { color: #34d399; }
+    .tile.killed .score-badge { color: #f87171; }
+    .tile.attacking .score-badge { color: #fbbf24; }
+
+    .progress-bar-bg {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: var(--radius-full);
+      background: var(--vf-blue);
+      transition: width 0.6s ease;
+    }
+    .tile.promoted .progress-bar-fill, .tile.survivor .progress-bar-fill { background: var(--emerald); }
+    .tile.killed .progress-bar-fill { background: var(--crimson); }
+    .tile.attacking .progress-bar-fill { background: var(--amber); }
+
+    .verdict-reason {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* Celebration Banner */
+    .winner-banner {
+      margin: 36px 0 24px;
+      padding: 20px 28px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(51, 92, 255, 0.08) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 10px 40px -10px rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      animation: pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .winner-trophy {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #34d399;
+      flex-shrink: 0;
+    }
+
+    .winner-content h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #34d399;
+      margin-bottom: 4px;
+    }
+
+    .winner-content p {
+      font-size: 13.5px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 70px 20px;
+      background: var(--panel);
+      border: 1px dashed var(--panel-border);
+      border-radius: var(--radius-lg);
+      color: var(--text-muted);
+    }
+    .empty-state b { color: #fff; }
+
+    /* CreateOS Terminal Component */
+    .terminal-section {
+      margin-top: 56px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .terminal-window {
+      background: #090a0f;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.8);
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .terminal-dots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .dot.red { background: #ff5f56; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #27c93f; }
+
+    .terminal-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .terminal-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-subtle);
+    }
+
+    .terminal-body {
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 14px 18px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      color: #cbd5e1;
+    }
+
+    .event-line {
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
+      padding: 1px 0;
+    }
+
+    .event-time {
+      color: var(--text-subtle);
+      flex-shrink: 0;
+    }
+
+    .event-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 1px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      min-width: 72px;
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-provision { background: rgba(51, 92, 255, 0.2); color: var(--vf-blue-light); border: 1px solid rgba(51, 92, 255, 0.35); }
+    .badge-fork { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
+    .badge-patch { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.35); }
+    .badge-attack { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
+    .badge-verdict { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+    .badge-cleanup { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.35); }
+    .badge-error { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); }
+    .badge-info { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); }
+
+    .event-msg {
+      word-break: break-word;
+      color: #e2e8f0;
+    }
+
+    /* Animation effects */
+    @keyframes pop {
+      from { transform: translateY(12px) scale(0.97); opacity: 0; }
+      to { transform: none; opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      header { padding: 12px 18px; }
+      main { padding: 20px 16px 60px; }
+      .hero-title { font-size: 1.85rem; }
+      .tiles-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-<header>
-  <h1>Darwin <small>fork, attack, promote. Safe by construction.</small></h1>
-  <span class="spacer"></span>
-  <span id="conn" class="pill">connecting</span>
-  <span id="runpill" class="pill">no run</span>
-  <button id="start">Start run</button>
-</header>
-<main>
-  <div id="board"></div>
-  <h2>Events</h2>
-  <div class="feed" id="feed"></div>
-</main>
-<script>
-const params = new URLSearchParams(location.search);
-const API = params.get("api") || "http://localhost:8787";
-const FIXTURE = params.has("fixture");
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const CHECKS = ["sequential-duplicates", "concurrent-duplicates", "malformed-payloads", "valid-after-malformed", "replay-old-event", "health-alive"];
-const LABEL = { forking: "forking", patching: "patching", attacking: "attacking", killed: "killed", survivor: "survivor", promoted: "promoted", error: "error" };
+  <div class="hk-grid" aria-hidden="true"></div>
+  <div class="hk-ambient-top" aria-hidden="true"></div>
+  <div class="hk-ambient-winner" id="winner-glow" aria-hidden="true"></div>
 
-let lastKey = "";
-let stickFeed = true;
+  <!-- Header -->
+  <header>
+    <div class="brand-group">
+      <a href="#" class="brand-logo" aria-label="Darwin Home">
+        <div class="logo-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+        </div>
+        <div class="brand-title">
+          <span>CreateOS</span>
+          <span class="brand-cross">×</span>
+          <span class="brand-stripe">Stripe Projects</span>
+        </div>
+      </a>
+      <span class="brand-tag">DARWIN ENGINE</span>
+    </div>
 
-function render(state) {
-  const { run, branches = [], attacks = [], events = [] } = state;
-  $("runpill").textContent = run ? `run ${String(run.id).slice(0, 8)} · ${run.status}` : "no run";
-  const running = run && (run.status === "running" || run.status === "pending");
-  $("start").disabled = !!running && !FIXTURE;
-  $("start").textContent = running ? "Running..." : "Start run";
+    <div class="nav-actions">
+      <!-- Human / Agent view mode pill -->
+      <div class="view-toggle" role="group" aria-label="View Mode">
+        <button type="button" id="toggle-human" class="active">Human</button>
+        <button type="button" id="toggle-agent">Agent</button>
+      </div>
 
-  const base = branches.find((b) => !b.parent_id);
-  const kids = branches.filter((b) => b.parent_id).sort((a, b) => String(a.sandbox_name).localeCompare(String(b.sandbox_name)));
-  const winner = branches.find((b) => b.status === "promoted" && b.parent_id) || branches.find((b) => run && b.id === run.winner_branch_id);
+      <div id="conn" class="pill">
+        <span class="pill-dot"></span>
+        <span id="conn-text">connecting</span>
+      </div>
 
-  const tile = (b, i) => {
-    const mine = attacks.filter((a) => a.branch_id === b.id);
-    const names = CHECKS.concat(mine.map((a) => a.name).filter((n) => !CHECKS.includes(n)));
-    const rows = names.map((n) => {
-      const a = mine.find((x) => x.name === n);
-      const icon = !a ? '<span class="wait">·</span>' : a.passed ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
-      return `<li>${icon}<span title="${esc(a?.detail)}">${esc(n)}</span></li>`;
-    }).join("");
-    const label = `Fix ${String.fromCharCode(65 + i)}`;
-    return `<div class="tile ${esc(b.status)}" data-id="${esc(b.id)}">
-      <span class="crown">PROMOTED</span>
-      <div class="title"><span>${label}</span><span class="badge">${esc(LABEL[b.status] || b.status)}</span></div>
-      <div class="meta">${esc(b.sandbox_name || "")} ${b.sandbox_ip ? "· " + esc(b.sandbox_ip) : ""}</div>
-      <div class="why">${esc(b.patch_rationale || (b.status === "forking" ? "Forking the paused base: RAM and processes copied..." : "Waiting for the builder agent..."))}</div>
-      <ul class="checks">${rows}</ul>
-      <div class="score">${b.score == null ? "" : esc(b.score)}<span class="meta">${b.score == null ? "" : " / 100"}</span></div>
-      <div class="reason">${esc(b.reason || "")}</div>
-    </div>`;
-  };
+      <div id="runpill" class="pill">
+        <span id="run-text">no run</span>
+      </div>
 
-  let html;
-  if (!branches.length) {
-    html = `<div class="empty">No run yet. Press <b>Start run</b> to fork the base sandbox and let the fixes race.</div>`;
-  } else {
-    html = `<div class="base"><b>BASE SANDBOX</b><div class="sub">buggy webhook service, paused snapshot${base?.sandbox_ip ? " · " + esc(base.sandbox_ip) : ""}</div></div>
-      <div class="stem"></div><div class="bar"></div>
-      <div class="tiles">${kids.map(tile).join("")}</div>`;
-    if (winner && run && run.status === "done") {
-      html += `<div class="banner">Survivor promoted: ${esc(winner.sandbox_name || winner.id)} passed every attack. ${kids.length - 1} other fork(s) deleted. None of the agent-written code touched a real machine.</div>`;
-    } else if (run && run.status === "done") {
-      html += `<div class="banner" style="color:var(--red);border-color:var(--red);background:rgba(248,81,73,.1)">No fork survived the red team. Nothing was promoted.</div>`;
+      <button id="start" class="btn-start">
+        <span id="start-label">Start run</span>
+        <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Body -->
+  <main>
+    <!-- Hero / Headline -->
+    <section class="hero-section">
+      <div class="hero-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>Firecracker Micro-VM Sandbox Isolation</span>
+      </div>
+      <h1 class="hero-title">Fork, Attack, <span>Promote.</span></h1>
+      <p class="hero-subtitle">
+        Four fixes race in isolated micro-VMs. A red team attacks every fork over a private network. 
+        Only the fix that survives is promoted. None of the agent-written code ever touches a real machine.
+      </p>
+
+      <!-- Stats Ribbon (Hackathon style cards) -->
+      <div class="stats-ribbon">
+        <div class="stat-card">
+          <span class="stat-label">Sandbox Concurrency</span>
+          <div class="stat-value" id="stat-slots">-- / 5</div>
+          <span class="stat-desc">Firecracker slot quota</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Fork Candidates</span>
+          <div class="stat-value" id="stat-forks">--</div>
+          <span class="stat-desc">Parallel builder fixes</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Red Team Suite</span>
+          <div class="stat-value" id="stat-attacks">6 Vectors</div>
+          <span class="stat-desc">Concurrent, fuzzing, replay</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Survival Rate</span>
+          <div class="stat-value" id="stat-survival">--</div>
+          <span class="stat-desc" id="stat-survival-desc">Natural selection active</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Canvas: Fork Tree & Sandbox Cards -->
+    <section class="canvas-section" id="board">
+      <div class="empty-state">
+        <p>Loading Darwin state...</p>
+      </div>
+    </section>
+
+    <!-- Winner Celebration Banner Target -->
+    <div id="winner-slot"></div>
+
+    <!-- Live Telemetry Terminal (CreateOS Terminal Component) -->
+    <section class="terminal-section">
+      <div class="section-header">
+        <div class="section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <span>Live Orchestrator Telemetry</span>
+        </div>
+        <span class="terminal-badge" id="event-count">0 events recorded</span>
+      </div>
+
+      <div class="terminal-window">
+        <div class="terminal-bar">
+          <div class="terminal-dots">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <span class="terminal-title">~/darwin/orchestrator · events.log</span>
+          <span class="terminal-badge">zsh</span>
+        </div>
+        <div class="terminal-body" id="feed">
+          <div class="event-line"><span class="event-time">--:--:--</span><span class="event-msg">Awaiting event stream...</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const API = params.get("api") || "http://localhost:8787";
+    const FIXTURE = params.has("fixture");
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+    const CHECKS = [
+      { id: "sequential-duplicates", label: "Sequential Duplicates (5x)" },
+      { id: "concurrent-duplicates", label: "Concurrent Burst (20x parallel)" },
+      { id: "malformed-payloads", label: "Malformed Payloads (4xx check)" },
+      { id: "valid-after-malformed", label: "Valid After Fuzzing" },
+      { id: "replay-old-event", label: "Replay Old Event" },
+      { id: "health-alive", label: "Health Liveness" }
+    ];
+
+    const LABEL = {
+      forking: "Forking VM",
+      patching: "Applying Patch",
+      attacking: "Under Attack",
+      killed: "Eliminated",
+      survivor: "Survivor",
+      promoted: "Promoted to Prod",
+      error: "Error"
+    };
+
+    let lastKey = "";
+    let stickFeed = true;
+
+    // View mode toggle
+    $("toggle-human").onclick = () => {
+      $("toggle-human").classList.add("active");
+      $("toggle-agent").classList.remove("active");
+    };
+    $("toggle-agent").onclick = () => {
+      $("toggle-agent").classList.add("active");
+      $("toggle-human").classList.remove("active");
+    };
+
+    function render(state) {
+      const { run, branches = [], attacks = [], events = [] } = state;
+
+      // Update Run pill
+      $("run-text").textContent = run ? `RUN ${String(run.id).slice(0, 8)} · ${run.status.toUpperCase()}` : "NO RUN";
+      const running = run && (run.status === "running" || run.status === "pending");
+      $("start").disabled = !!running && !FIXTURE;
+      $("start-label").textContent = running ? "Racing..." : "Start run";
+
+      // Calculate Stats
+      const base = branches.find((b) => !b.parent_id);
+      const kids = branches.filter((b) => b.parent_id).sort((a, b) => String(a.sandbox_name).localeCompare(String(b.sandbox_name)));
+      const winner = branches.find((b) => b.status === "promoted" && b.parent_id) || branches.find((b) => run && b.id === run.winner_branch_id);
+
+      const totalForks = kids.length;
+      const liveCount = (base ? 1 : 0) + (running ? totalForks : (winner ? 1 : 0));
+      $("stat-slots").textContent = `${Math.min(5, Math.max(liveCount, base ? 4 : 0))} / 5`;
+      $("stat-forks").textContent = totalForks ? `${totalForks} Candidates` : "0";
+
+      const passedCount = kids.filter((k) => k.status === "survivor" || k.status === "promoted").length;
+      if (totalForks) {
+        const rate = Math.round((passedCount / totalForks) * 100);
+        $("stat-survival").textContent = `${rate}% (${passedCount}/${totalForks})`;
+        $("stat-survival-desc").textContent = winner ? "1 fix promoted to prod" : (running ? "Attacks in progress" : "Evaluated by judge");
+      } else {
+        $("stat-survival").textContent = "--";
+        $("stat-survival-desc").textContent = "Natural selection active";
+      }
+
+      // Winner ambient lighting
+      if (winner && run && run.status === "done") {
+        $("winner-glow").classList.add("active");
+      } else {
+        $("winner-glow").classList.remove("active");
+      }
+
+      // Render Tree & Tiles
+      const renderTile = (b, i) => {
+        const mine = attacks.filter((a) => a.branch_id === b.id);
+        const checkRows = CHECKS.map((c) => {
+          const a = mine.find((x) => x.name === c.id);
+          const icon = !a ? '<span class="check-icon wait">●</span>' : a.passed ? '<span class="check-icon ok">✓</span>' : '<span class="check-icon no">✕</span>';
+          const detail = a?.detail ? esc(a.detail) : "pending";
+          return `
+            <li class="check-item" title="${detail}">
+              <div class="check-left">
+                ${icon}
+                <span class="check-name">${esc(c.label)}</span>
+              </div>
+              <span class="check-detail">${detail}</span>
+            </li>
+          `;
+        }).join("");
+
+        const fixLetter = String.fromCharCode(65 + i);
+        const scoreVal = b.score != null ? b.score : (b.status === "attacking" ? 50 : 0);
+        const scorePercent = Math.max(0, Math.min(100, scoreVal));
+
+        return `
+          <div class="tile ${esc(b.status)}" data-id="${esc(b.id)}">
+            <span class="crown-banner">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              PROMOTED TO PROD
+            </span>
+            <div class="tile-top">
+              <div class="tile-identity">
+                <span class="tile-name">Fix ${fixLetter}</span>
+                <span class="tile-badge">${esc(LABEL[b.status] || b.status)}</span>
+              </div>
+            </div>
+            <div class="tile-meta">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+              <span>${esc(b.sandbox_name || b.id)}</span>
+              ${b.sandbox_ip ? `<span>· ${esc(b.sandbox_ip)}</span>` : ""}
+            </div>
+            <div class="tile-why">
+              ${esc(b.patch_rationale || (b.status === "forking" ? "Cloning Firecracker micro-VM snapshot (RAM & processes)..." : "Builder agent writing fix candidate..."))}
+            </div>
+            <ul class="checks-list">
+              ${checkRows}
+            </ul>
+            <div class="fitness-section">
+              <div class="fitness-header">
+                <span class="fitness-label">Fitness Score</span>
+                <span class="score-badge">${b.score != null ? `${esc(b.score)} / 100` : (b.status === "attacking" ? "Evaluating..." : "--")}</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: ${scorePercent}%"></div>
+              </div>
+              <div class="verdict-reason">${esc(b.reason || (b.status === "attacking" ? "Red team executing attack vectors..." : ""))}</div>
+            </div>
+          </div>
+        `;
+      };
+
+      let boardHtml;
+      if (!branches.length) {
+        boardHtml = `
+          <div class="empty-state">
+            <p>No active race found. Click <b>Start run</b> to launch Darwin: fork the base sandbox and let the agent fixes race.</p>
+          </div>
+        `;
+      } else {
+        boardHtml = `
+          <div class="base-wrapper">
+            <div class="base-card">
+              <div class="base-header">
+                <span class="base-pill">Micro-VM Source</span>
+                <span class="base-title">BASE SANDBOX</span>
+              </div>
+              <div class="base-meta">
+                <span>${esc(base?.sandbox_name || "dw-base")}</span>
+                ${base?.sandbox_ip ? `<span>· ${esc(base.sandbox_ip)}</span>` : ""}
+                <span>· Port 8080</span>
+              </div>
+              <div class="base-desc">
+                Buggy Stripe Webhook Service · Paused Memory Snapshot Captured
+              </div>
+            </div>
+            <svg class="branch-tree-svg" viewBox="0 0 800 48" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="branchGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#335cff" stop-opacity="0.8"/>
+                  <stop offset="100%" stop-color="#335cff" stop-opacity="0.2"/>
+                </linearGradient>
+              </defs>
+              <line x1="400" y1="0" x2="400" y2="24" stroke="url(#branchGlow)" stroke-width="2"/>
+              <line x1="160" y1="24" x2="640" y2="24" stroke="url(#branchGlow)" stroke-width="2"/>
+              <line x1="160" y1="24" x2="160" y2="48" stroke="url(#branchGlow)" stroke-width="2"/>
+              <line x1="400" y1="24" x2="400" y2="48" stroke="url(#branchGlow)" stroke-width="2"/>
+              <line x1="640" y1="24" x2="640" y2="48" stroke="url(#branchGlow)" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="tiles-grid">
+            ${kids.map(renderTile).join("")}
+          </div>
+        `;
+      }
+
+      // Check for winner celebration banner
+      let winnerBannerHtml = "";
+      if (winner && run && run.status === "done") {
+        winnerBannerHtml = `
+          <div class="winner-banner">
+            <div class="winner-trophy">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                <path d="M4 22h16"></path>
+                <path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1 .45-1 1v1h12v-1c0-.55-.45-1-1-1h-2c-.55 0-1-.45-1-1v-2.34"></path>
+                <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path>
+              </svg>
+            </div>
+            <div class="winner-content">
+              <h3>Natural Selection Complete · Survivor Promoted to Production</h3>
+              <p>
+                <b>${esc(winner.sandbox_name || winner.id)}</b> passed 100% of the red-team attack suite in an isolated Firecracker micro-VM.
+                ${kids.length - 1} defective candidate forks were terminated. 
+                Zero agent-written code ever touched the host machine.
+              </p>
+            </div>
+          </div>
+        `;
+      } else if (run && run.status === "done" && !winner) {
+        winnerBannerHtml = `
+          <div class="winner-banner" style="border-color: rgba(239, 68, 68, 0.5); background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(20, 15, 20, 0.7) 100%);">
+            <div class="winner-trophy" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+            </div>
+            <div class="winner-content">
+              <h3 style="color: #f87171;">No Fix Survived the Red-Team Attacks</h3>
+              <p>All candidate forks failed one or more critical security checks. None were promoted.</p>
+            </div>
+          </div>
+        `;
+      }
+
+      const key = JSON.stringify([boardHtml, winnerBannerHtml]);
+      if (key !== lastKey) {
+        $("board").innerHTML = boardHtml;
+        $("winner-slot").innerHTML = winnerBannerHtml;
+        lastKey = key;
+      }
+
+      // Render Telemetry Terminal
+      $("event-count").textContent = `${events.length} events logged`;
+      const feed = $("feed");
+      stickFeed = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 35;
+      feed.innerHTML = events.map((e) => {
+        const timeStr = new Date(e.at).toLocaleTimeString([], { hour12: false });
+        const kind = esc(e.kind || "info");
+        return `
+          <div class="event-line">
+            <span class="event-time">${timeStr}</span>
+            <span class="event-badge badge-${kind}">${kind}</span>
+            <span class="event-msg">${esc(e.message)}</span>
+          </div>
+        `;
+      }).join("") || `<div class="event-line"><span class="event-time">--:--:--</span><span class="event-msg">No telemetry events logged yet.</span></div>`;
+
+      if (stickFeed) {
+        feed.scrollTop = feed.scrollHeight;
+      }
     }
-  }
-  // Only touch the DOM when something changed, so CSS animations don't restart every second.
-  const key = JSON.stringify([html]);
-  if (key !== lastKey) { $("board").innerHTML = html; lastKey = key; }
 
-  const feed = $("feed");
-  stickFeed = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 30;
-  feed.innerHTML = events.map((e) => {
-    const t = new Date(e.at).toLocaleTimeString([], { hour12: false });
-    return `<div><span class="t">${esc(t)}</span><span class="k k-${esc(e.kind)}">${esc(e.kind)}</span>${esc(e.message)}</div>`;
-  }).join("") || '<div class="t">no events yet</div>';
-  if (stickFeed) feed.scrollTop = feed.scrollHeight;
-}
+    const DEFAULT_FIXTURE = {
+      run: { id: "run-demo", status: "done", created_at: "2026-10-17T20:10:00Z", winner_branch_id: "br-b" },
+      branches: [
+        { id: "br-base", run_id: "run-demo", parent_id: null, sandbox_id: "sb-base", sandbox_name: "dw-demo-base", sandbox_ip: "10.0.60.10", status: "promoted", patch_rationale: null, score: null, reason: null, created_at: "2026-10-17T20:10:00Z" },
+        { id: "br-a", run_id: "run-demo", parent_id: "br-base", sandbox_id: "sb-a", sandbox_name: "dw-demo-a", sandbox_ip: "10.0.60.11", status: "killed", patch_rationale: "Skip ids already in a seen-set, recorded after the work.", score: 17, reason: "Failed 5/6: concurrent-duplicates, malformed-payloads. same event id delivered 20x in parallel -> 20 ledger entries (want 1)", created_at: "2026-10-17T20:10:20Z" },
+        { id: "br-b", run_id: "run-demo", parent_id: "br-base", sandbox_id: "sb-b", sandbox_name: "dw-demo-b", sandbox_ip: "10.0.60.12", status: "promoted", patch_rationale: "Claim the event id in an in-flight set before the await, and validate the body with 4xx errors.", score: 100, reason: "Survived all 6 attacks.", created_at: "2026-10-17T20:10:20Z" },
+        { id: "br-c", run_id: "run-demo", parent_id: "br-base", sandbox_id: "sb-c", sandbox_name: "dw-demo-c", sandbox_ip: "10.0.60.13", status: "killed", patch_rationale: "Validate input and wrap parsing in try/catch; check a Map after the work.", score: 67, reason: "Failed 2/6: concurrent-duplicates, replay-old-event. same event id delivered 20x in parallel -> 7 ledger entries (want 1)", created_at: "2026-10-17T20:10:20Z" }
+      ],
+      attacks: [
+        { id: 1, branch_id: "br-a", name: "sequential-duplicates", passed: true, detail: "5x -> 1 entry" },
+        { id: 2, branch_id: "br-a", name: "concurrent-duplicates", passed: false, detail: "20x in parallel -> 20 entries (want 1)" },
+        { id: 3, branch_id: "br-a", name: "malformed-payloads", passed: false, detail: "expected 4xx, got -1" },
+        { id: 4, branch_id: "br-a", name: "valid-after-malformed", passed: false, detail: "status -1" },
+        { id: 5, branch_id: "br-a", name: "replay-old-event", passed: false, detail: "fetch failed" },
+        { id: 6, branch_id: "br-a", name: "health-alive", passed: false, detail: "service is down" },
+        { id: 7, branch_id: "br-b", name: "sequential-duplicates", passed: true, detail: "5x -> 1 entry" },
+        { id: 8, branch_id: "br-b", name: "concurrent-duplicates", passed: true, detail: "20x -> 1 entry" },
+        { id: 9, branch_id: "br-b", name: "malformed-payloads", passed: true, detail: "all 7 rejected with 4xx" },
+        { id: 10, branch_id: "br-b", name: "valid-after-malformed", passed: true, detail: "200 / 1" },
+        { id: 11, branch_id: "br-b", name: "replay-old-event", passed: true, detail: "1 entry" },
+        { id: 12, branch_id: "br-b", name: "health-alive", passed: true, detail: "ok" },
+        { id: 13, branch_id: "br-c", name: "sequential-duplicates", passed: true, detail: "5x -> 1 entry" },
+        { id: 14, branch_id: "br-c", name: "concurrent-duplicates", passed: false, detail: "20x -> 7 entries (want 1)" },
+        { id: 15, branch_id: "br-c", name: "malformed-payloads", passed: true, detail: "all 7 rejected with 4xx" },
+        { id: 16, branch_id: "br-c", name: "valid-after-malformed", passed: true, detail: "200 / 1" },
+        { id: 17, branch_id: "br-c", name: "replay-old-event", passed: false, detail: "2 entries" },
+        { id: 18, branch_id: "br-c", name: "health-alive", passed: true, detail: "ok" }
+      ],
+      events: [
+        { id: 1, run_id: "run-demo", at: "2026-10-17T20:10:00Z", kind: "provision", message: "Base sandbox created and buggy service started on :8080" },
+        { id: 2, run_id: "run-demo", at: "2026-10-17T20:10:08Z", kind: "fork", message: "Base paused; forking into 3 branches (RAM and processes copied)" },
+        { id: 3, run_id: "run-demo", at: "2026-10-17T20:10:20Z", kind: "patch", message: "Builder agent wrote 3 different fixes" },
+        { id: 4, run_id: "run-demo", at: "2026-10-17T20:10:30Z", kind: "attack", message: "Red team attacking 3 forks over the private network" },
+        { id: 5, run_id: "run-demo", at: "2026-10-17T20:10:45Z", kind: "verdict", message: "patch-a killed (17), patch-c killed (67), patch-b survived (100)" },
+        { id: 6, run_id: "run-demo", at: "2026-10-17T20:10:48Z", kind: "cleanup", message: "Losers deleted; patch-b promoted" }
+      ]
+    };
 
-async function poll() {
-  try {
-    const res = await fetch(FIXTURE ? "fixtures/run.json" : `${API}/api/runs/latest`);
-    if (!res.ok) throw new Error(res.status);
-    render(await res.json());
-    $("conn").textContent = FIXTURE ? "fixture" : "live"; $("conn").className = "pill live";
-  } catch (e) {
-    $("conn").textContent = "API offline"; $("conn").className = "pill off";
-  }
-}
+    async function poll() {
+      const isFile = location.protocol === "file:";
+      if (FIXTURE || isFile) {
+        try {
+          const res = await fetch("fixtures/run.json");
+          if (res.ok) {
+            render(await res.json());
+          } else {
+            render(DEFAULT_FIXTURE);
+          }
+        } catch {
+          render(DEFAULT_FIXTURE);
+        }
+        $("conn-text").textContent = FIXTURE ? "FIXTURE MODE" : (isFile ? "LOCAL PREVIEW" : "LIVE");
+        $("conn").className = "pill fixture";
+        return;
+      }
 
-$("start").onclick = async () => {
-  $("start").disabled = true;
-  try { await fetch(`${API}/api/runs`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }); } catch {}
-  poll();
-};
+      try {
+        const res = await fetch(`${API}/api/runs/latest`);
+        if (!res.ok) throw new Error(res.status);
+        render(await res.json());
+        $("conn-text").textContent = "API CONNECTED";
+        $("conn").className = "pill live";
+      } catch (e) {
+        $("conn-text").textContent = "API OFFLINE";
+        $("conn").className = "pill off";
+      }
+    }
 
-poll();
-setInterval(poll, 1000);
-</script>
+    $("start").onclick = async () => {
+      $("start").disabled = true;
+      try {
+        await fetch(`${API}/api/runs`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}"
+        });
+      } catch {}
+      poll();
+    };
+
+    poll();
+    setInterval(poll, 1000);
+  </script>
 </body>
 </html>

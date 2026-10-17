@@ -1,3 +1,4 @@
+import path from "node:path";
 import express from "express";
 import Stripe from "stripe";
 import { loadConfig } from "./config.js";
@@ -101,6 +102,9 @@ app.post("/api/runs", async (req, res) => {
   const n = Math.min(4, Math.max(2, Number(req.body?.n ?? 3)));
   res.status(202).json({ runId: await startRun(n) });
 });
+
+app.use(express.static(path.join(cfg.rootDir, "ui")));
+app.get("/", (_req, res) => res.sendFile(path.join(cfg.rootDir, "ui", "index.html")));
 
 const server = app.listen(cfg.port, () => console.log(`darwin orchestrator API on http://localhost:${cfg.port}`));
 process.on("SIGINT", () => { server.close(); void db.close().finally(() => process.exit(0)); });
