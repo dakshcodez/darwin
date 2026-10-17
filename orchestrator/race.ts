@@ -83,7 +83,8 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
   const { cfg, client, db } = opts;
   const agents = opts.agents ?? (await loadAgents());
   const n = opts.n ?? 3;
-  const runId = `run-${new Date().toISOString().slice(11, 19).replace(/:/g, "")}-${randomBytes(2).toString("hex")}`;
+  // Sandbox names are max 22 chars (lowercase, digits, hyphens): "dw-" + id + "-base" must fit, so keep the id at 6.
+  const runId = `r${randomBytes(3).toString("hex").slice(0, 5)}`;
   const serviceDir = resolveServiceDir(cfg, opts.serviceDir);
   const ev = (kind: Parameters<Db["event"]>[1], m: string) => db.event(runId, kind, m);
 
