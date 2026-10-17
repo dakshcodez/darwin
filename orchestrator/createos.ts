@@ -25,7 +25,7 @@ export const SERVICE_PORT = 8080;
 const T = {
   create: 90_000,
   pause: 120_000,
-  fork: 180_000,
+  forkWait: 60_000,
   destroy: 90_000,
   exec: 120_000,
   port: 30_000,
@@ -124,12 +124,22 @@ export async function pauseBox(box: Box): Promise<void> {
   await box.sandbox.waitUntilPaused({ timeoutMs: T.pause });
 }
 
-/** Fork a PAUSED base. Returns once the fork is running (or paused if startPaused). */
-export async function forkBox(base: Box, opts: { startPaused?: boolean; egress?: string[] } = {}): Promise<Box> {
-  const fork = await base.sandbox.fork({ start_paused: opts.startPaused, egress: opts.egress }, { timeoutMs: T.fork });
-  if (opts.startPaused) await fork.waitUntilPaused({ timeoutMs: T.fork });
-  else await fork.waitUntilRunning({ timeoutMs: T.fork });
-  return toBox(fork);
+/**
+ * Fork a PAUSED base. Returns once the fork is running (or paused if startPaused).
+ * Forks occasionally hang on the EU endpoint (seen 2 of ~8 forks, even below the concurrency cap), so the wait is
+ * short and a stuck fork is destroyed instead of leaking a sandbox slot. Callers should retry.
+ */
+export async function forkBox(base: Box, opts: { startPaused?: boolean; egress?: string[]; timeoutMs?: number } = {}): Promise<Box> {
+  const timeoutMs = opts.timeoutMs ?? T.forkWait;
+  const fork = await base.sandbox.fork({ start_paused: opts.startPaused, egress: opts.egress }, { timeoutMs: T.exec });
+  try {
+    if (opts.startPaused) await fork.waitUntilPaused({ timeoutMs });
+    else await fork.waitUntilRunning({ timeoutMs });
+    return await toBox(fork);
+  } catch (e) {
+    await fork.destroy({ timeoutMs: T.destroy }).catch(() => undefined);
+    throw e;
+  }
 }
 
 export async function resumeBox(box: Box): Promise<void> {
