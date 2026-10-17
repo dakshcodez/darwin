@@ -1,4 +1,5 @@
 import type { BranchRow, RunState } from "../contracts/types.js";
+import { cube, type CubeMode, type RGB } from "./iso.js";
 
 /**
  * Terminal rendering for the Darwin CLI. No dependencies: plain ANSI escapes and box-drawing characters.
@@ -57,10 +58,22 @@ function chip(b: BranchRow, f: number): Chip {
     case "forking": return { label: "CLONING MICRO-VM", color: c.violet, icon: spin(f), dim: false };
     case "patching": return { label: "APPLYING PATCH", color: c.blue, icon: spin(f), dim: false };
     case "attacking": return { label: "RUNNING TESTS", color: c.amber, icon: spin(f), dim: false };
-    case "killed": return { label: "ELIMINATED", color: c.red, icon: "✖", dim: true };
-    case "survivor": return { label: "SURVIVED", color: c.green, icon: "✔", dim: false };
+    case "killed": return { label: "ELIMINATED", color: c.red, icon: "×", dim: true };
+    case "survivor": return { label: "SURVIVED", color: c.green, icon: "✓", dim: false };
     case "promoted": return { label: "PROMOTED", color: (s) => c.bold(c.green(s)), icon: "★", dim: false };
     default: return { label: "ERROR", color: c.red, icon: "!", dim: true };
+  }
+}
+
+function cubeFor(b: BranchRow): { mode: CubeMode; color: RGB; icon: string } {
+  switch (b.status) {
+    case "forking": return { mode: "boot", color: [176, 128, 255], icon: "◐" };
+    case "patching": return { mode: "boot", color: [96, 145, 255], icon: "✎" };
+    case "attacking": return { mode: "scan", color: [255, 184, 64], icon: "◉" };
+    case "killed": return { mode: "dead", color: [255, 98, 98], icon: "×" };
+    case "survivor": return { mode: "idle", color: [70, 220, 130], icon: "✓" };
+    case "promoted": return { mode: "glow", color: [70, 220, 130], icon: "★" };
+    default: return { mode: "dead", color: [255, 98, 98], icon: "!" };
   }
 }
 
@@ -98,11 +111,14 @@ export interface FrameContext {
   cols: number;
   endpoint: string;
   model?: string;
+  rows?: number; // terminal height; the 3D view needs about 44
+  flat?: boolean; // force the flat layout
 }
 
 export function frame(state: RunState | null, ctx: FrameContext): string[] {
   const W = Math.max(78, Math.min(ctx.cols - 2, 124));
   const f = ctx.frame;
+  const d3 = !ctx.flat && (ctx.rows ?? 50) >= 46 && !process.env.NO_COLOR;
   const out: string[] = [];
   const bannerInner = W - 2;
   out.push(c.blue("╭" + "─".repeat(bannerInner) + "╮"));
@@ -112,12 +128,12 @@ export function frame(state: RunState | null, ctx: FrameContext): string[] {
   const elapsed = Math.floor((Date.now() - ctx.startedAt) / 1000);
   const mm = String(Math.floor(elapsed / 60)).padStart(1, "0"), ss = String(elapsed % 60).padStart(2, "0");
   const label = (k: string) => c.gray(k.padEnd(9));
-  out.push(`${label("target")}${c.white(ctx.targetName)}${ctx.testCmd ? c.gray("  ·  tests: ") + c.cyan(ctx.testCmd) : ""}${" ".repeat(2)}${c.gray(`⏱ ${mm}:${ss}`)}`);
+  out.push(`${label("target")}${c.white(ctx.targetName)}${ctx.testCmd ? c.gray("  ·  tests: ") + c.cyan(ctx.testCmd) : ""}${" ".repeat(2)}${c.gray(`elapsed ${mm}:${ss}`)}`);
   if (ctx.bug) for (const [i, l] of wrap(ctx.bug, W - 10, 2).entries()) out.push(`${i === 0 ? label("bug") : " ".repeat(9)}${c.dim(c.white(l))}`);
   out.push(`${label("sandbox")}${c.gray("CreateOS Firecracker micro-VMs  ·  ")}${c.gray(ctx.endpoint.replace(/^https?:\/\//, ""))}${ctx.model ? c.gray("  ·  model ") + c.gray(ctx.model) : ""}`);
   const stack = state?.events.find((e) => e.kind === "provision" && e.message.startsWith("Stripe Projects stack"));
   if (stack) {
-    const names = [...stack.message.matchAll(/(\w+)\/(\w+) \(complete\)/g)].map((m) => `${m[1].toLowerCase()}/${m[2]} ${c.green("✔")}`);
+    const names = [...stack.message.matchAll(/(\w+)\/(\w+) \(complete\)/g)].map((m) => `${m[1].toLowerCase()}/${m[2]} ${c.green("✓")}`);
     out.push(`${label("stack")}${c.gray("Stripe Projects  ·  ")}${names.join("  ") || c.gray("provisioned")}`);
   }
   out.push("");
@@ -131,14 +147,21 @@ export function frame(state: RunState | null, ctx: FrameContext): string[] {
   const base = state.branches.find((b) => !b.parent_id);
   const cands = state.branches.filter((b) => b.parent_id);
   const baseAttack = base ? state.attacks.find((a) => a.branch_id === base.id) : undefined;
-  const baseState = cands.length ? `${c.violet("❄")} ${c.gray("paused snapshot, RAM and processes captured")}` : `${c.violet(spin(f))} ${c.gray("booting and loading the project…")}`;
+  const baseState = cands.length ? `${c.violet("◈")} ${c.gray("paused snapshot (RAM + processes)")}` : `${c.violet(spin(f))} ${c.gray("booting and loading the project…")}`;
   const baseLines = [
     `${c.white(base?.sandbox_name ?? "base sandbox")}  ${c.gray(base?.sandbox_ip ?? "")}`,
     baseState,
-    baseAttack ? `${c.red("✖")} ${c.gray("baseline: " + baseAttack.detail)}` : c.gray("running the baseline tests…"),
+    baseAttack ? `${c.red("×")} ${c.gray("baseline: " + baseAttack.detail)}` : c.gray("running the baseline tests…"),
   ];
-  const bw = Math.min(W - 6, 64);
-  for (const l of box(baseLines, bw, c.bold(c.blue("BASE SANDBOX")), c.blue)) out.push(center(l, W));
+  const bw = Math.min(W - 6, 66);
+  if (d3) {
+    const bc = cube({ size: "lg", color: [96, 145, 255], mode: cands.length ? "idle" : "boot", frame: f, icon: cands.length ? "◈" : "◐" });
+    const off = Math.max(0, Math.floor((bc.length - baseLines.length) / 2));
+    const merged = bc.map((cl, i) => `${cl}   ${baseLines[i - off] ?? ""}`);
+    for (const l of box(merged, bw, c.bold(c.blue("BASE SANDBOX")), c.blue)) out.push(center(l, W));
+  } else {
+    for (const l of box(baseLines, bw, c.bold(c.blue("BASE SANDBOX")), c.blue)) out.push(center(l, W));
+  }
 
   if (cands.length) {
     out.push(center(c.gray("│"), W));
@@ -151,7 +174,12 @@ export function frame(state: RunState | null, ctx: FrameContext): string[] {
       const mine = state.attacks.filter((a) => a.branch_id === b.id);
       const detail = mine[0]?.detail ?? "";
       const inner = cw - 4;
+      const cs = cubeFor(b);
+      const cubeLines = d3
+        ? cube({ size: "sm", color: cs.color, mode: cs.mode, frame: f + i * 5, icon: cs.icon }).map((l) => " ".repeat(Math.max(0, Math.floor((inner - 13) / 2))) + l)
+        : [];
       const lines = [
+        ...cubeLines,
         `${ch.color(ch.icon)} ${ch.color(ch.label)}`,
         `${c.white(clip(b.sandbox_name ?? "…", inner))}`,
         c.gray(b.sandbox_ip ?? "provisioning…"),
@@ -173,10 +201,10 @@ export function frame(state: RunState | null, ctx: FrameContext): string[] {
     out.push("");
     out.push(winner
       ? `  ${c.bold(c.green("★ " + (winner.sandbox_name ?? winner.id) + " promoted"))}${c.gray("  ·  " + cands.filter((b) => b.status === "killed").length + " eliminated  ·  untrusted code never touched this machine")}`
-      : `  ${c.bold(c.red("✖ no candidate survived"))}${c.gray("  ·  nothing promoted")}`);
+      : `  ${c.bold(c.red("× no candidate survived"))}${c.gray("  ·  nothing promoted")}`);
   } else if (state.run.status === "error") {
     out.push("");
-    out.push(`  ${c.bold(c.red("✖ run failed"))} ${c.gray("see the event feed below")}`);
+    out.push(`  ${c.bold(c.red("× run failed"))} ${c.gray("see the event feed below")}`);
   }
 
   // event feed
