@@ -31,6 +31,8 @@ export interface RaceOptions {
   bugReport?: string;
   /** Keep the promoted winner running after the run (default true, handy for the demo). */
   keepWinner?: boolean;
+  /** Hard limit for the whole run (default 8 minutes). On expiry the run is marked failed and our sandboxes are destroyed. */
+  deadlineMs?: number;
 }
 
 export interface RaceResult {
@@ -94,6 +96,17 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
   await ev("provision", describeStack(await stackSummary())); // shows the Stripe Projects stack in the UI feed
   const created: os.Box[] = [];
   let netId: string | undefined;
+  // Watchdog: a stuck SDK call must never leave the UI spinning forever or hold sandbox slots. Destroying our
+  // sandboxes makes in-flight calls fail fast, which sends the main flow into its catch block below.
+  let timedOut = false;
+  const watchdog = setTimeout(() => {
+    timedOut = true;
+    void (async () => {
+      await ev("error", `run exceeded ${((opts.deadlineMs ?? 480_000) / 1000).toFixed(0)}s; aborting and destroying sandboxes`);
+      await db.setRunStatus(runId, "error").catch(() => undefined);
+      await os.destroyAllOurs(client).catch(() => undefined);
+    })();
+  }, opts.deadlineMs ?? 480_000);
   let winner: string | null = null;
   let verdicts: Verdict[] = [];
 
@@ -245,6 +258,7 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
     if (!keep) await os.deleteNetwork(client, net.id).catch(() => undefined);
     netId = keep ? undefined : netId; // the network stays while the winner is a member
 
+    if (timedOut) throw new Error("run aborted by the watchdog");
     await db.setRunStatus(runId, "done", winner);
     return { runId, winnerBranchId: winner, verdicts };
   } catch (e) {
@@ -254,5 +268,7 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
     await Promise.allSettled(created.map((b) => os.destroyBox(b)));
     if (netId) await os.deleteNetwork(client, netId).catch(() => undefined);
     throw e;
+  } finally {
+    clearTimeout(watchdog);
   }
 }
