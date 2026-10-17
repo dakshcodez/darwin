@@ -681,7 +681,26 @@
     .footer-links a:hover {
       color: #0f172a;
     }
-  </style>
+  
+    .target-select {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-ink-muted);
+      background: #fff;
+      border: 1px solid rgba(15, 23, 42, 0.14);
+      border-radius: var(--radius-full);
+      padding: 8px 14px;
+      cursor: pointer;
+      outline: none;
+    }
+    .target-select:focus { border-color: var(--color-vf-blue); }
+    .target-select:disabled { opacity: 0.55; cursor: not-allowed; }
+    .card-diff { margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--color-onyx); color: #cbd5e1; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; overflow-x: auto; max-height: 220px; }
+    .card-diff .d-add { color: #4ade80; }
+    .card-diff .d-del { color: #f87171; }
+    .card-diff .d-hunk { color: #7dd3fc; }
+    .empty-state { padding: 64px 24px; text-align: center; color: var(--color-ink-muted); font-size: 15px; }
+</style>
 </head>
 <body>
   <!-- Header -->
@@ -707,8 +726,13 @@
         <div class="nav-right">
           <div class="status-pill">
             <span class="status-dot"></span>
-            <span id="conn-text">Orchestrator Online</span>
+            <span id="conn-text">Connecting&hellip;</span>
           </div>
+
+          <select id="target-select" class="target-select" aria-label="What to fix">
+            <option value="webhook">Target: buggy webhook (attack suite)</option>
+            <option value="slugify">Target: slugify (unit tests)</option>
+          </select>
 
           <button id="start-btn" class="btn-race">
             <span id="start-label">Start Race</span>
@@ -727,25 +751,25 @@
       <div class="arena-bar-inner">
         <div class="arena-headline-box">
           <h1>Adversarial Micro-VM Arena</h1>
-          <p>Real-time execution dashboard for concurrent candidate patch evaluation under adversarial stress.</p>
+          <p>Live view of a Darwin run: candidate fixes racing in isolated micro-VMs, judged by tests or an attack suite.</p>
         </div>
 
         <div class="arena-meta-stats">
           <div class="meta-stat-item">
             <span class="meta-stat-lbl">Active Run</span>
-            <span class="meta-stat-val" id="meta-run-id">run-demo</span>
+            <span class="meta-stat-val" id="meta-run-id">&mdash;</span>
           </div>
           <div class="meta-stat-item">
             <span class="meta-stat-lbl">Parallel Forks</span>
-            <span class="meta-stat-val" id="meta-forks">03</span>
+            <span class="meta-stat-val" id="meta-forks">&mdash;</span>
           </div>
           <div class="meta-stat-item">
-            <span class="meta-stat-lbl">Stress Vectors</span>
-            <span class="meta-stat-val" id="meta-vectors">06</span>
+            <span class="meta-stat-lbl">Checks per Fix</span>
+            <span class="meta-stat-val" id="meta-vectors">&mdash;</span>
           </div>
           <div class="meta-stat-item">
             <span class="meta-stat-lbl">Survival Rate</span>
-            <span class="meta-stat-val" id="meta-survival" style="color: #059669;">33%</span>
+            <span class="meta-stat-val" id="meta-survival" style="color: #059669;">&mdash;</span>
           </div>
         </div>
       </div>
@@ -768,9 +792,9 @@
             </svg>
           </div>
           <div>
-            <h3 class="winner-title" id="winner-title">Candidate dw-fork-b Promoted to Production</h3>
+            <h3 class="winner-title" id="winner-title">Winning fix promoted</h3>
             <p class="winner-desc" id="winner-desc">
-              Survived all 6 adversarial test vectors with a 100/100 fitness score. Zero duplicate ledger entries under 20x parallel bursts.
+              Survived every check.
             </p>
           </div>
         </div>
@@ -866,224 +890,180 @@
       ]
     };
 
+    // The bundled sample run is only shown with ?preview, clearly labelled. Otherwise every number on this page is live.
+    const PREVIEW = new URLSearchParams(location.search).has("preview");
     const startBtn = document.getElementById("start-btn");
     const startLabel = document.getElementById("start-label");
+    const targetSelect = document.getElementById("target-select");
+    const connText = (t) => { const el = document.getElementById("conn-text"); if (el) el.textContent = t; };
+
+    function setBusy(busy) {
+      startBtn.disabled = busy;
+      targetSelect.disabled = busy;
+      startLabel.textContent = busy ? "Racing..." : "Start Race";
+    }
 
     async function startRace() {
-      startBtn.disabled = true;
-      startLabel.textContent = "Racing...";
-
+      setBusy(true);
       try {
         const res = await fetch("/api/runs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ n: 3 })
+          body: JSON.stringify({ n: 3, example: targetSelect.value })
         });
-        if (!res.ok && res.status !== 202) {
-          throw new Error("HTTP " + res.status);
-        }
+        if (!res.ok && res.status !== 409) throw new Error("HTTP " + res.status);
       } catch (e) {
-        simulateLocalRun();
+        // never fake a race: say the orchestrator could not be reached
+        connText("Orchestrator unreachable");
+        setBusy(false);
       }
     }
-
     startBtn.addEventListener("click", startRace);
 
-    function simulateLocalRun() {
-      const sim = JSON.parse(JSON.stringify(DEFAULT_FIXTURE));
-      sim.run.status = "running";
-      sim.branches.forEach(b => { if (b.parent_id) { b.status = "forking"; b.score = null; } });
-      sim.attacks = [];
-      sim.events = [{ id: 1, run_id: "run-sim", at: new Date().toISOString(), kind: "fork", message: "Cloning 3 micro-VMs in parallel from snapshot..." }];
-      renderState(sim);
-
-      setTimeout(() => {
-        sim.branches.forEach(b => { if (b.parent_id) b.status = "attacking"; });
-        sim.events.push({ id: 2, run_id: "run-sim", at: new Date().toISOString(), kind: "attack", message: "Red team executing 6 adversarial stress vectors..." });
-        renderState(sim);
-      }, 2500);
-
-      setTimeout(() => {
-        renderState(DEFAULT_FIXTURE);
-        startBtn.disabled = false;
-        startLabel.textContent = "Start Race";
-      }, 5500);
+    function escapeHtml(v) {
+      return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
+
+    function diffHtml(diff) {
+      return escapeHtml(diff).split("\n").map((l) => {
+        if (l.startsWith("+++") || l.startsWith("---") || l.startsWith("diff ") || l.startsWith("index ")) return '<span style="opacity:.55">' + l + "</span>";
+        if (l.startsWith("@@")) return '<span class="d-hunk">' + l + "</span>";
+        if (l.startsWith("+")) return '<span class="d-add">' + l + "</span>";
+        if (l.startsWith("-")) return '<span class="d-del">' + l + "</span>";
+        return l;
+      }).join("\n");
+    }
+
+    const ICON_PASS = '<span class="icon-pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg></span>';
+    const ICON_FAIL = '<span class="icon-fail"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>';
 
     function renderState(data) {
       const branches = data.branches || [];
       const attacks = data.attacks || [];
       const events = data.events || [];
       const run = data.run || {};
+      const candidates = branches.filter((b) => b.parent_id !== null && b.parent_id !== undefined);
+      const base = branches.find((b) => !b.parent_id);
+      const running = run.status === "running" || run.status === "pending";
+      setBusy(running);
 
-      const candidates = branches.filter(b => b.parent_id !== null);
+      // Meta stats: all derived from the run
+      document.getElementById("meta-run-id").textContent = run.id || "\u2014";
+      document.getElementById("meta-forks").textContent = candidates.length ? String(candidates.length).padStart(2, "0") : "\u2014";
+      const perFix = Math.max(0, ...candidates.map((b) => attacks.filter((a) => a.branch_id === b.id).length));
+      document.getElementById("meta-vectors").textContent = perFix ? String(perFix).padStart(2, "0") : "\u2014";
+      const decided = candidates.filter((b) => ["promoted", "survivor", "killed", "error"].includes(b.status));
+      const survivors = candidates.filter((b) => b.status === "promoted" || b.status === "survivor");
+      document.getElementById("meta-survival").textContent =
+        candidates.length && decided.length === candidates.length ? `${survivors.length}/${candidates.length}` : "\u2014";
 
-      // Meta Stats
-      const metaRunId = document.getElementById("meta-run-id");
-      if (metaRunId) metaRunId.textContent = run.id || "run-live";
-
-      const metaForks = document.getElementById("meta-forks");
-      if (metaForks) metaForks.textContent = String(candidates.length).padStart(2, "0");
-
-      const metaVectors = document.getElementById("meta-vectors");
-      if (metaVectors) {
-        const uniqueAttackNames = new Set(attacks.map(a => a.name));
-        metaVectors.textContent = String(uniqueAttackNames.size || 6).padStart(2, "0");
-      }
-
-      const survivors = candidates.filter(b => b.status === "promoted" || b.status === "survived");
-      const metaSurvival = document.getElementById("meta-survival");
-      if (metaSurvival && candidates.length > 0) {
-        const pct = Math.round((survivors.length / candidates.length) * 100);
-        metaSurvival.textContent = pct + "%";
-      }
-
-      // Render Cards
       const container = document.getElementById("candidates-container");
       container.innerHTML = "";
+      if (!run.id) {
+        container.innerHTML = '<div class="empty-state">No run yet. Pick a target and press Start Race.</div>';
+      }
 
-      const codeSnippets = {
-        "dw-demo-a": `// Patch A: Post-fulfillment deduplication\nif (seen.has(event.id)) return;\nawait processWebhookFulfillment(event);\nseen.add(event.id); // 50ms race window`,
-        "dw-demo-b": `// Patch B: Atomic in-flight reservation\nif (!inFlight.add(event.id)) return 409;\ntry { await processWebhookFulfillment(event); }\nfinally { inFlight.delete(event.id); }`,
-        "dw-demo-c": `// Patch C: Global mutex lock\nconst lock = await mutex.acquire();\ntry { await processWebhookFulfillment(event); }\nfinally { lock.release(); } // Deadlock under load`
+      const STATUS = {
+        forking: ["forking", "CLONING"], patching: ["forking", "PATCHING"], attacking: ["attacking", "TESTING"],
+        killed: ["killed", "KILLED"], survivor: ["promoted", "SURVIVED"], promoted: ["promoted", "PROMOTED"], error: ["killed", "ERROR"]
       };
-
-      const patchSubtitles = [
-        "Post-Execution Check",
-        "Atomic In-Flight Locking",
-        "Global Mutex Lock"
-      ];
+      const PENDING_TEXT = { forking: "Cloning a micro-VM from the paused snapshot\u2026", patching: "Applying the model's patch\u2026" };
 
       candidates.forEach((b, idx) => {
-        const isWinner = b.status === "promoted" || (run.winner_branch_id === b.id);
-        const isKilled = b.status === "killed";
-        const isAttacking = b.status === "attacking";
-
+        const isWinner = b.status === "promoted" || run.winner_branch_id === b.id;
+        const isKilled = b.status === "killed" || b.status === "error";
+        const [statusClass, statusText] = isWinner ? ["promoted", "PROMOTED"] : (STATUS[b.status] || ["forking", String(b.status).toUpperCase()]);
         const card = document.createElement("div");
-        card.className = "candidate-card" + 
-          (isWinner ? " is-promoted" : "") + 
-          (isKilled ? " is-killed" : "");
+        card.className = "candidate-card" + (isWinner ? " is-promoted" : "") + (isKilled ? " is-killed" : "");
 
-        const branchAttacks = attacks.filter(a => a.branch_id === b.id);
-
-        let statusClass = "forking";
-        let statusText = b.status.toUpperCase();
-        if (isWinner) { statusClass = "promoted"; statusText = "PROMOTED"; }
-        else if (isKilled) { statusClass = "killed"; statusText = "KILLED"; }
-        else if (isAttacking) { statusClass = "attacking"; statusText = "ATTACKING"; }
-
-        const patchCode = codeSnippets[b.sandbox_name] || `// Candidate patch logic\n${b.patch_rationale || "Synthesizing patch..."}`;
-
-        let attackRowsHtml = "";
-        if (branchAttacks.length > 0) {
-          attackRowsHtml = branchAttacks.map(a => `
+        const mine = attacks.filter((a) => a.branch_id === b.id);
+        const rows = mine.length
+          ? mine.map((a) => `
             <li class="attack-item">
-              <span class="attack-name">
-                ${a.passed ? 
-                  `<span class="icon-pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg></span>` : 
-                  `<span class="icon-fail"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>`}
-                <span>${a.name}</span>
-              </span>
-              <span class="attack-detail">${a.detail || (a.passed ? "passed" : "failed")}</span>
-            </li>
-          `).join("");
-        } else {
-          attackRowsHtml = `
-            <li class="attack-item"><span class="attack-name"><span>concurrency-burst</span></span><span class="attack-detail">pending</span></li>
-            <li class="attack-item"><span class="attack-name"><span>malformed-4xx</span></span><span class="attack-detail">pending</span></li>
-            <li class="attack-item"><span class="attack-name"><span>idempotency-replay</span></span><span class="attack-detail">pending</span></li>
-          `;
-        }
+              <span class="attack-name">${a.passed ? ICON_PASS : ICON_FAIL}<span>${escapeHtml(a.name)}</span></span>
+              <span class="attack-detail">${escapeHtml(a.detail || (a.passed ? "passed" : "failed"))}</span>
+            </li>`).join("")
+          : `<li class="attack-item"><span class="attack-name"><span>Waiting for results</span></span><span class="attack-detail">${b.status === "attacking" ? "running" : "pending"}</span></li>`;
 
-        const scoreVal = b.score !== null ? b.score : (isWinner ? 100 : (isKilled ? 17 : 50));
-        const subtitle = patchSubtitles[idx] || "Algorithmic Patch";
+        const hasScore = b.score !== null && b.score !== undefined;
+        const score = hasScore ? Number(b.score) : 0;
+        const strategy = b.patch_rationale || PENDING_TEXT[b.status] || "Waiting for the builder\u2026";
+        const where = [b.sandbox_name || "provisioning", b.sandbox_ip].filter(Boolean).join(" \u00b7 ");
 
         card.innerHTML = `
           <div class="card-top">
-            <span class="card-idx">0${idx + 1} · dw-fork-${String.fromCharCode(97 + idx)}</span>
+            <span class="card-idx">0${idx + 1} \u00b7 ${escapeHtml(where)}</span>
             <span class="status-badge ${statusClass}">${statusText}</span>
           </div>
 
           <h3 class="card-title">Candidate Patch ${String.fromCharCode(65 + idx)}</h3>
-          <p class="card-strategy">${b.patch_rationale || "Analyzing race condition and generating patch..."}</p>
+          <p class="card-strategy">${escapeHtml(strategy)}</p>
 
-          <pre class="card-code"><code>${escapeHtml(patchCode)}</code></pre>
+          ${b.patch_diff ? `<pre class="card-diff"><code>${diffHtml(b.patch_diff)}</code></pre>` : ""}
 
           <ul class="attack-list">
-            ${attackRowsHtml}
+            ${rows}
           </ul>
 
           <div class="card-score-box">
             <div class="score-row">
               <span class="score-lbl">Fitness Score</span>
-              <span class="score-val">${scoreVal} / 100</span>
+              <span class="score-val">${hasScore ? score + " / 100" : "\u2014"}</span>
             </div>
             <div class="meter-track">
-              <div class="meter-fill" style="width: ${scoreVal}%"></div>
+              <div class="meter-fill" style="width: ${hasScore ? score : 0}%"></div>
             </div>
-            <p class="card-verdict">${b.reason || (isWinner ? "All attack vectors passed. Promoted to production." : "Testing against red team...")}</p>
+            <p class="card-verdict">${escapeHtml(b.reason || (b.status === "attacking" ? "Running the checks against this candidate\u2026" : ""))}</p>
           </div>
         `;
-
         container.appendChild(card);
       });
 
-      // Update Winner Celebration Card
+      // Winner banner
       const winnerBanner = document.getElementById("winner-banner");
-      const winner = candidates.find(b => b.status === "promoted" || run.winner_branch_id === b.id);
-
+      const winner = candidates.find((b) => b.status === "promoted" || run.winner_branch_id === b.id);
       if (winner && (run.status === "done" || run.winner_branch_id)) {
+        const out = candidates.filter((b) => b.status === "killed").length;
         winnerBanner.style.display = "flex";
-        document.getElementById("winner-title").textContent = `${winner.sandbox_name} Verified & Promoted to Production`;
-        document.getElementById("winner-desc").textContent = winner.reason || "Survived all red-team attack vectors. In-flight set verification preserved idempotency under concurrent bursts.";
+        document.getElementById("winner-title").textContent = `${winner.sandbox_name || winner.id} promoted`;
+        document.getElementById("winner-desc").textContent = `${winner.reason || "Survived every check."}${out ? ` ${out} other candidate${out > 1 ? "s were" : " was"} eliminated.` : ""}`;
       } else {
         winnerBanner.style.display = "none";
       }
 
-      // Render Logs
+      // Telemetry
       const logsContainer = document.getElementById("logs-container");
-      const logCount = document.getElementById("log-count");
-      if (logCount) logCount.textContent = `${events.length} events`;
-
-      if (events.length > 0) {
-        logsContainer.innerHTML = events.map(ev => {
-          const timeStr = (ev.at ? new Date(ev.at).toLocaleTimeString() : new Date().toLocaleTimeString());
-          const kind = ev.kind || "info";
-          return `
-            <div class="log-line">
-              <span class="log-time">${timeStr}</span>
-              <span class="log-badge kind-${kind}">${kind}</span>
-              <span class="log-msg">${escapeHtml(ev.message)}</span>
-            </div>
-          `;
-        }).join("");
-        logsContainer.scrollTop = logsContainer.scrollHeight;
-      }
+      document.getElementById("log-count").textContent = `${events.length} events`;
+      logsContainer.innerHTML = events.length ? events.map((ev) => {
+        const kind = ["provision", "fork", "patch", "attack", "verdict", "cleanup", "error", "info"].includes(ev.kind) ? ev.kind : "info";
+        const t = ev.at ? new Date(ev.at).toLocaleTimeString() : "";
+        return `
+          <div class="log-line">
+            <span class="log-time">${escapeHtml(t)}</span>
+            <span class="log-badge kind-${kind}">${kind}</span>
+            <span class="log-msg">${escapeHtml(ev.message)}</span>
+          </div>`;
+      }).join("") : "";
+      logsContainer.scrollTop = logsContainer.scrollHeight;
     }
 
-    function escapeHtml(str) {
-      if (!str) return "";
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-
-    // Polling from backend
     async function pollState() {
       try {
         const res = await fetch("/api/runs/latest");
         if (res.ok) {
-          const data = await res.json();
-          renderState(data);
-          document.getElementById("conn-text").textContent = "Connected to Orchestrator";
+          renderState(await res.json());
+          connText("Connected to Orchestrator");
           return;
         }
-      } catch (e) {
-        // Fallback to fixture
-      }
-      renderState(DEFAULT_FIXTURE);
+      } catch (e) { /* fall through */ }
+      if (PREVIEW) { renderState(DEFAULT_FIXTURE); connText("PREVIEW \u00b7 SAMPLE DATA"); }
+      else connText("Orchestrator unreachable");
     }
 
-    // Initial render
-    renderState(DEFAULT_FIXTURE);
+    // First paint: an honest empty state, or the labelled sample in ?preview
+    if (PREVIEW) { renderState(DEFAULT_FIXTURE); connText("PREVIEW \u00b7 SAMPLE DATA"); }
+    else renderState({ run: null, branches: [], attacks: [], events: [] });
+    pollState();
     setInterval(pollState, 1500);
   </script>
 </body>
