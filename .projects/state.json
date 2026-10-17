@@ -1,5 +1,88 @@
 {
-  "version": 1,
-  "providers": {},
-  "resources": {}
+  "version": 2,
+  "providers": {
+    "createos": {
+      "name": "createos"
+    },
+    "neon": {
+      "name": "Neon"
+    },
+    "openrouter": {
+      "name": "OpenRouter"
+    }
+  },
+  "resources": {
+    "createos-plan": {
+      "livemode": true,
+      "name": "createos-plan",
+      "providerName": "createos",
+      "serviceId": "free"
+    },
+    "createos-project": {
+      "livemode": true,
+      "name": "createos-project",
+      "providerName": "createos",
+      "serviceId": "project"
+    },
+    "neon-plan": {
+      "livemode": true,
+      "name": "neon-plan",
+      "providerName": "Neon",
+      "serviceId": "free"
+    },
+    "neon-postgres": {
+      "livemode": true,
+      "name": "neon-postgres",
+      "providerName": "Neon",
+      "serviceId": "postgres"
+    },
+    "openrouter-api": {
+      "livemode": true,
+      "name": "openrouter-api",
+      "providerName": "OpenRouter",
+      "serviceId": "api"
+    }
+  },
+  "environments": {
+    "default": {
+      "output": ".env",
+      "resources": [
+        {
+          "resourceName": "createos-plan"
+        },
+        {
+          "resourceName": "createos-project"
+        },
+        {
+          "resourceName": "neon-plan"
+        },
+        {
+          "resourceName": "neon-postgres"
+        },
+        {
+          "resourceName": "openrouter-api"
+        }
+      ],
+      "variables": [
+        {
+          "variableName": "createos-sandbox-base-url",
+          "envKey": "CREATEOS_SANDBOX_BASE_URL"
+        },
+        {
+          "variableName": "createos-sandbox-url",
+          "envKey": "CREATEOS_SANDBOX_URL"
+        }
+      ]
+    }
+  },
+  "variables": {
+    "createos-sandbox-base-url": {
+      "name": "createos-sandbox-base-url",
+      "backendId": "fprjvar_61Vb1BWWcFSpvwO8R16VazxCKTSQ06r6lrsRQsSnI5f6"
+    },
+    "createos-sandbox-url": {
+      "name": "createos-sandbox-url",
+      "backendId": "fprjvar_61Vb1BSNCNRzv6ogZ16VazxCKTSQ06r6lrsRQsSnI852"
+    }
+  }
 }
