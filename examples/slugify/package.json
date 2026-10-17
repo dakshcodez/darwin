@@ -1,0 +1,1 @@
+{ "name": "slugify-example", "private": true, "scripts": { "test": "node --test" } }

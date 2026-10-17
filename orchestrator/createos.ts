@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { createClient, type Sandbox, type CreateosSandboxClient } from "@nodeops-createos/sandbox";
 import type { Config } from "./config.js";
 
@@ -32,7 +36,10 @@ const T = {
 };
 
 export function makeClient(cfg: Config): CreateosSandboxClient {
-  return createClient({ apiKey: cfg.sandboxApiKey, baseUrl: cfg.sandboxBaseUrl });
+  // Passing our own fetch makes the SDK skip its custom HTTP/2 transport. That transport has a bug: when a response
+  // stream ends without a status it builds `new Response(.., {status: 0})`, which throws inside an event handler and
+  // kills the whole process (seen while destroying sandboxes). Plain Node fetch has no such failure mode.
+  return createClient({ apiKey: cfg.sandboxApiKey, baseUrl: cfg.sandboxBaseUrl, fetch: (url, init) => fetch(url, init) });
 }
 
 async function toBox(sandbox: Sandbox): Promise<Box> {
@@ -76,6 +83,19 @@ export async function pushFiles(box: Box, files: Record<string, string>): Promis
   }
 }
 
+/** Copy a whole local project into the sandbox: tar it, upload one file, unpack inside. Skips node_modules, .git, .env*. */
+export async function pushDir(box: Box, localDir: string, destDir = APP_DIR): Promise<void> {
+  const tgz = path.join(tmpdir(), `darwin-${process.pid}-${Date.now()}.tgz`);
+  try {
+    execFileSync("tar", ["czf", tgz, "--exclude=node_modules", "--exclude=.git", "--exclude=.darwin", "--exclude=.env", "--exclude=.env.*", "-C", localDir, "."]);
+    await box.sandbox.files.upload("/tmp/project.tgz", new Blob([readFileSync(tgz)]), { timeoutMs: T.exec });
+  } finally {
+    rmSync(tgz, { force: true });
+  }
+  const r = await sh(box, `mkdir -p ${destDir} && tar xzf /tmp/project.tgz -C ${destDir} && rm -f /tmp/project.tgz`);
+  if (r.exitCode !== 0) throw new Error(`unpacking the project failed: ${r.stderr.slice(0, 200)}`);
+}
+
 export interface ExecResult {
   stdout: string;
   stderr: string;
@@ -85,7 +105,8 @@ export interface ExecResult {
 
 /** Run one command to completion. Never run a background job here (it blocks): use startProcess. */
 export async function exec(box: Box, cmd: string, args: string[] = [], opts: { env?: Record<string, string>; timeoutMs?: number } = {}): Promise<ExecResult> {
-  const { result, exec_ms } = await box.sandbox.runCommand(cmd, args, { env: opts.env, timeoutMs: opts.timeoutMs ?? T.exec });
+  // retry: false because the SDK's default retry re-sends a timed-out exec, which would run the same attack again
+  const { result, exec_ms } = await box.sandbox.runCommand(cmd, args, { env: opts.env, timeoutMs: opts.timeoutMs ?? T.exec, retry: false });
   return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exit_code, ms: exec_ms };
 }
 
@@ -164,9 +185,10 @@ export async function resumeBox(box: Box): Promise<void> {
   await box.sandbox.waitUntilRunning({ timeoutMs: T.pause });
 }
 
-export async function destroyBox(box: Pick<Box, "sandbox">): Promise<void> {
+/** Destroy a sandbox. `wait: false` returns as soon as the destroy is accepted (EU destroys take 30-90 s to finish). */
+export async function destroyBox(box: Pick<Box, "sandbox">, opts: { wait?: boolean } = {}): Promise<void> {
   await box.sandbox.destroy({ timeoutMs: T.destroy });
-  await box.sandbox.waitUntilDestroyed({ timeoutMs: T.destroy }).catch(() => undefined);
+  if (opts.wait !== false) await box.sandbox.waitUntilDestroyed({ timeoutMs: T.destroy }).catch(() => undefined);
 }
 
 /** Lock a sandbox's outbound traffic. Always pass the red team's IP so private-network attacks still reach it. */

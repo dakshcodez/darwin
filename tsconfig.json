@@ -8,7 +8,15 @@
     "skipLibCheck": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["contracts", "orchestrator", "infra", "agents"]
+  "include": [
+    "contracts",
+    "orchestrator",
+    "infra",
+    "agents",
+    "cli"
+  ]
 }
