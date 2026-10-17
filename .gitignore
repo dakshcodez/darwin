@@ -1,0 +1,20 @@
+# secrets and local state
+.env
+.env.*
+!.env.example
+.projects/vault
+.projects/cache
+.projects/state.test.json
+.projects/state.local.test.json
+
+# agent tooling installed locally (not part of the project)
+.agents/
+.claude/
+.hermes/
+.cursor/
+skills-lock.json
+
+# node
+node_modules/
+dist/
+*.log
