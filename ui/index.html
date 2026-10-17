@@ -1099,8 +1099,8 @@
 <body>
   <!-- Top Announcement Bar -->
   <div class="announcement-bar">
-    <span>CreateOS Firecracker Micro-VM Engine for Stripe Projects</span>
-    <a href="#arena">View live race arena &rarr;</a>
+    <span>CreateOS × Stripe Projects Hackathon · Continuous Micro-VM Red-Teaming for Autonomous Agents</span>
+    <a href="#arena">Explore live race arena &rarr;</a>
   </div>
 
   <!-- Sticky Header -->
@@ -1110,7 +1110,7 @@
         <a href="#" class="brand-group" aria-label="Darwin Autonomous Engine">
           <div class="brand-mark">D</div>
           <span class="brand-text">Darwin</span>
-          <span class="brand-badge">Autonomous Engine</span>
+          <span class="brand-badge">Adversarial Engine</span>
         </a>
 
         <div class="nav-actions">
@@ -1127,7 +1127,7 @@
           </div>
 
           <button id="start" class="btn-race-main">
-            <span id="start-label">Start race</span>
+            <span id="start-label">Launch live race</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
               <line x1="5" y1="12" x2="19" y2="12"></line>
               <polyline points="12 5 19 12 12 19"></polyline>
@@ -1152,25 +1152,26 @@
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
-            <span>CreateOS Firecracker Micro-VM Isolation</span>
+            <span>Zero-Trust Firecracker Sandboxes · Adversarial Agent Evaluation</span>
           </div>
 
           <h1 class="display-1">Natural Selection For <span class="text-vf-blue-light">Agent Code.</span></h1>
 
           <p class="t-lead">
-            Four fixes race in isolated micro-VMs. A red team attacks every fork over a private network. 
-            Only the fix that survives is promoted. Untrusted agent code never touches the real machine.
+            Multiple candidate patches compete concurrently inside isolated micro-VMs. 
+            An automated adversarial red team hammers every fork across an isolated private subnet. 
+            Only the patch that survives adversarial chaos is promoted to production. Untrusted code never touches your live infrastructure.
           </p>
 
           <div class="hero-cta-row">
             <button id="btn-hero-start" class="btn-pill-white">
-              <span>Start live race</span>
+              <span>Launch live race</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
                 <polyline points="12 5 19 12 12 19"></polyline>
               </svg>
             </button>
-            <a href="#arena" class="btn-pill-outline">Inspect arena</a>
+            <a href="#arena" class="btn-pill-outline">Inspect arena architecture</a>
           </div>
 
           <!-- CreateOS-style 4-Box Countdown Timer -->
@@ -1186,17 +1187,17 @@
               </div>
               <div class="box-countdown">
                 <span class="box-val" id="stat-attacks">06</span>
-                <span class="box-lbl">Attacks</span>
+                <span class="box-lbl">Vectors</span>
               </div>
               <div class="box-countdown">
                 <span class="box-val text-emerald" id="stat-survival">33%</span>
-                <span class="box-lbl">Survivor</span>
+                <span class="box-lbl">Survival</span>
               </div>
             </div>
 
             <p class="timer-caption">
-              orchestrator active<br>
-              <span>Continuous Micro-VM Darwinism</span>
+              Deterministic Evaluation Layer<br>
+              <span>Micro-VM Mutation & Adversarial Selection</span>
             </p>
           </div>
         </div>
@@ -1214,11 +1215,11 @@
               <span class="term-shell">zsh</span>
             </div>
 
-            <pre class="term-pre"><code><span class="t-comment"># 1. Base micro-VM snapshot created & paused with disk and memory intact</span>
+            <pre class="term-pre"><code><span class="t-comment"># 1. Base micro-VM snapshot captured & paused with memory intact</span>
 <span class="t-prompt">$ </span><span class="t-cmd">stripe projects run darwin --base dw-base</span>
 <span class="t-comment"># 2. Cloned 3 byte-identical micro-VMs in parallel across private subnet</span>
 <span class="t-prompt">$ </span><span class="t-cmd">darwin fork --from dw-base --count 3 --network 10.0.60.0/24</span>
-<span class="t-comment"># 3. Dispatched 6 red team attack vectors (concurrency, fuzz, replay)</span>
+<span class="t-comment"># 3. Dispatched 6 automated adversarial stress vectors (bursts, fuzz, replay)</span>
 <span class="t-prompt">$ </span><span class="t-cmd">darwin attack --suite ./attacks/redteam.json</span>
 <span class="t-pass">✔ Candidate B: SURVIVED (6/6 vectors passed, fitness score 100)</span>
 <span class="t-fail">✖ Candidate A: KILLED (assertion failed: race window 50ms)</span>
@@ -1229,11 +1230,11 @@
             <div class="term-footer">
               <div class="term-footer-item">
                 <span class="bullet-gray"></span>
-                <span>Stack set up with Stripe Projects</span>
+                <span>Stack provisioned with Stripe Projects</span>
               </div>
               <div class="term-footer-item">
                 <span class="bullet-blue"></span>
-                <span>Code runs in CreateOS sandbox</span>
+                <span>Execution sandboxed in CreateOS Firecracker</span>
               </div>
             </div>
           </div>
@@ -1243,28 +1244,28 @@
       <!-- Specs Horizontal Strip (Matching CreateOS DL Grid) -->
       <dl class="specs-strip">
         <div class="spec-cell">
-          <dt class="spec-label">Isolation</dt>
+          <dt class="spec-label">Isolation Layer</dt>
           <dd class="spec-value">Firecracker KVM</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Private Network</dt>
+          <dt class="spec-label">Adversarial Subnet</dt>
           <dd class="spec-value">10.0.60.0/24</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Clone Speed</dt>
-          <dd class="spec-value">42ms Snapshot</dd>
+          <dt class="spec-label">Snapshot Clone</dt>
+          <dd class="spec-value">42ms Instant Fork</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Red Team</dt>
+          <dt class="spec-label">Stress Suite</dt>
           <dd class="spec-value">6 Automated Vectors</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Containment</dt>
-          <dd class="spec-value">100% Contained</dd>
+          <dt class="spec-label">Containment SLA</dt>
+          <dd class="spec-value">100% Zero-Egress</dd>
         </div>
         <div class="spec-cell">
-          <dt class="spec-label">Survival</dt>
-          <dd class="spec-value">1 of 3 Promoted</dd>
+          <dt class="spec-label">Promotion Policy</dt>
+          <dd class="spec-value">Single Verified Survivor</dd>
         </div>
       </dl>
     </div>
@@ -1276,11 +1277,11 @@
       <!-- Section Header -->
       <div class="sec-head">
         <div>
-          <h2 class="display-2">Arena: Micro-VM Race & Elimination</h2>
+          <h2 class="display-2">Adversarial Arena: Micro-VM Survival</h2>
         </div>
         <p class="arena-intro">
-          Each candidate runs an independent fix in an isolated Firecracker sandbox. 
-          A red team attacks every fork over a private network. Only the survivor is promoted to production.
+          Autonomous builder agents propose distinct algorithmic patches. Each candidate is tested in an ephemeral byte-identical micro-VM 
+          against high-concurrency bursts, payload fuzzing, and idempotency replay attacks. Only the verified survivor is promoted to production.
         </p>
       </div>
 
@@ -1305,15 +1306,15 @@
             </svg>
           </div>
           <div>
-            <h3 class="winner-headline" id="winner-title">dw-fork-b Promoted to Production</h3>
+            <h3 class="winner-headline" id="winner-title">Candidate dw-fork-b Verified & Promoted to Production</h3>
             <p class="winner-desc" id="winner-desc">
-              Survived all 6 red-team attacks. In-flight set verification preserved idempotency under 20x parallel bursts with 0 duplicate ledger entries.
+              Surpassed all 6 adversarial test vectors with a 100/100 fitness score. Zero duplicate ledger entries under 20x parallel bursts. Production route safely updated.
             </p>
           </div>
         </div>
         <div class="winner-actions">
           <button type="button" class="btn-deploy-winner">
-            <span>Deploy to live route</span>
+            <span>Route Production Traffic</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
@@ -1329,9 +1330,9 @@
               <polyline points="4 17 10 11 4 5"></polyline>
               <line x1="12" y1="19" x2="20" y2="19"></line>
             </svg>
-            <span>Live Telemetry & Event Stream</span>
+            <span>Real-Time Darwinian Telemetry Stream</span>
           </h3>
-          <span style="font-family: var(--font-mono); font-size: 12px; color: #737373;">SSE · events.log</span>
+          <span style="font-family: var(--font-mono); font-size: 12px; color: #737373;">SSE · audit-stream.log</span>
         </div>
 
         <div class="logs-terminal">
@@ -1369,37 +1370,37 @@
       "run": { "id": "run-demo", "status": "done", "created_at": "2026-10-17T20:10:00Z", "winner_branch_id": "br-b" },
       "branches": [
         { "id": "br-base", "run_id": "run-demo", "parent_id": null, "sandbox_id": "sb-base", "sandbox_name": "dw-demo-base", "sandbox_ip": "10.0.60.10", "status": "promoted", "patch_rationale": null, "score": null, "reason": null, "created_at": "2026-10-17T20:10:00Z" },
-        { "id": "br-a", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-a", "sandbox_name": "dw-demo-a", "sandbox_ip": "10.0.60.11", "status": "killed", "patch_rationale": "Skip ids already in a seen-set, recorded after the work.", "score": 17, "reason": "Failed 5/6: concurrent-duplicates. same event id delivered 20x in parallel -> 20 ledger entries (want 1)", "created_at": "2026-10-17T20:10:20Z" },
-        { "id": "br-b", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-b", "sandbox_name": "dw-demo-b", "sandbox_ip": "10.0.60.12", "status": "promoted", "patch_rationale": "Claim the event id in an in-flight set before the await, and validate the body with 4xx errors.", "score": 100, "reason": "Survived all 6 attacks.", "created_at": "2026-10-17T20:10:20Z" },
-        { "id": "br-c", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-c", "sandbox_name": "dw-demo-c", "sandbox_ip": "10.0.60.13", "status": "killed", "patch_rationale": "Validate input and wrap parsing in try/catch; check a Map after the work.", "score": 67, "reason": "Failed 2/6: concurrent-duplicates. same event id delivered 20x in parallel -> 7 ledger entries (want 1)", "created_at": "2026-10-17T20:10:20Z" }
+        { "id": "br-a", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-a", "sandbox_name": "dw-demo-a", "sandbox_ip": "10.0.60.11", "status": "killed", "patch_rationale": "Appends event IDs to a seen-set after async fulfillment completes. Vulnerable to concurrent execution windows.", "score": 17, "reason": "Killed in Action · 20 concurrent duplicate webhooks produced 20 duplicate charges (50ms race window).", "created_at": "2026-10-17T20:10:20Z" },
+        { "id": "br-b", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-b", "sandbox_name": "dw-demo-b", "sandbox_ip": "10.0.60.12", "status": "promoted", "patch_rationale": "Claims event ID atomically in an in-flight reservation Set prior to async I/O. Rejects concurrent collisions with 409.", "score": 100, "reason": "Verified Survivor · Survived all 6 stress vectors. Zero duplicate charges recorded under 20x parallel bursts.", "created_at": "2026-10-17T20:10:20Z" },
+        { "id": "br-c", "run_id": "run-demo", "parent_id": "br-base", "sandbox_id": "sb-c", "sandbox_name": "dw-demo-c", "sandbox_ip": "10.0.60.13", "status": "killed", "patch_rationale": "Serializes fulfillment using a global async mutex with a 10-second acquisition timeout.", "score": 67, "reason": "Killed in Action · Mutex timeout under burst traffic resulted in cascading request drops and deadlock.", "created_at": "2026-10-17T20:10:20Z" }
       ],
       "attacks": [
-        { "id": 1, "branch_id": "br-a", "name": "sequential-duplicates", "passed": true, "detail": "5x -> 1 entry" },
-        { "id": 2, "branch_id": "br-a", "name": "concurrent-duplicates", "passed": false, "detail": "20x parallel -> 20 entries" },
-        { "id": 3, "branch_id": "br-a", "name": "malformed-payloads", "passed": false, "detail": "expected 4xx, got -1" },
-        { "id": 4, "branch_id": "br-a", "name": "valid-after-malformed", "passed": false, "detail": "status -1" },
-        { "id": 5, "branch_id": "br-a", "name": "replay-old-event", "passed": false, "detail": "fetch failed" },
-        { "id": 6, "branch_id": "br-a", "name": "health-alive", "passed": false, "detail": "service is down" },
-        { "id": 7, "branch_id": "br-b", "name": "sequential-duplicates", "passed": true, "detail": "5x -> 1 entry" },
-        { "id": 8, "branch_id": "br-b", "name": "concurrent-duplicates", "passed": true, "detail": "20x -> 1 entry" },
-        { "id": 9, "branch_id": "br-b", "name": "malformed-payloads", "passed": true, "detail": "all 7 rejected with 4xx" },
-        { "id": 10, "branch_id": "br-b", "name": "valid-after-malformed", "passed": true, "detail": "200 / 1" },
-        { "id": 11, "branch_id": "br-b", "name": "replay-old-event", "passed": true, "detail": "1 entry" },
-        { "id": 12, "branch_id": "br-b", "name": "health-alive", "passed": true, "detail": "ok" },
-        { "id": 13, "branch_id": "br-c", "name": "sequential-duplicates", "passed": true, "detail": "5x -> 1 entry" },
-        { "id": 14, "branch_id": "br-c", "name": "concurrent-duplicates", "passed": false, "detail": "20x -> 7 entries" },
-        { "id": 15, "branch_id": "br-c", "name": "malformed-payloads", "passed": true, "detail": "all 7 rejected with 4xx" },
-        { "id": 16, "branch_id": "br-c", "name": "valid-after-malformed", "passed": true, "detail": "200 / 1" },
-        { "id": 17, "branch_id": "br-c", "name": "replay-old-event", "passed": false, "detail": "2 entries" },
-        { "id": 18, "branch_id": "br-c", "name": "health-alive", "passed": true, "detail": "ok" }
+        { "id": 1, "branch_id": "br-a", "name": "sequential-duplicates", "passed": true, "detail": "5x sequential -> 1 entry" },
+        { "id": 2, "branch_id": "br-a", "name": "concurrent-duplicates", "passed": false, "detail": "20x burst -> 20 duplicate entries" },
+        { "id": 3, "branch_id": "br-a", "name": "malformed-payloads", "passed": false, "detail": "expected 4xx, got internal error" },
+        { "id": 4, "branch_id": "br-a", "name": "valid-after-malformed", "passed": false, "detail": "service unresponsive" },
+        { "id": 5, "branch_id": "br-a", "name": "replay-old-event", "passed": false, "detail": "replay delivered twice" },
+        { "id": 6, "branch_id": "br-a", "name": "health-alive", "passed": false, "detail": "health check failed" },
+        { "id": 7, "branch_id": "br-b", "name": "sequential-duplicates", "passed": true, "detail": "5x sequential -> 1 entry" },
+        { "id": 8, "branch_id": "br-b", "name": "concurrent-duplicates", "passed": true, "detail": "20x burst -> 1 entry (verified)" },
+        { "id": 9, "branch_id": "br-b", "name": "malformed-payloads", "passed": true, "detail": "7/7 rejected with 4xx" },
+        { "id": 10, "branch_id": "br-b", "name": "valid-after-malformed", "passed": true, "detail": "200 OK / 1 ledger entry" },
+        { "id": 11, "branch_id": "br-b", "name": "replay-old-event", "passed": true, "detail": "idempotent replay handled" },
+        { "id": 12, "branch_id": "br-b", "name": "health-alive", "passed": true, "detail": "healthy (latency: 18ms)" },
+        { "id": 13, "branch_id": "br-c", "name": "sequential-duplicates", "passed": true, "detail": "5x sequential -> 1 entry" },
+        { "id": 14, "branch_id": "br-c", "name": "concurrent-duplicates", "passed": false, "detail": "20x burst -> 7 entries (deadlock)" },
+        { "id": 15, "branch_id": "br-c", "name": "malformed-payloads", "passed": true, "detail": "7/7 rejected with 4xx" },
+        { "id": 16, "branch_id": "br-c", "name": "valid-after-malformed", "passed": true, "detail": "200 OK / 1 ledger entry" },
+        { "id": 17, "branch_id": "br-c", "name": "replay-old-event", "passed": false, "detail": "2 duplicate entries recorded" },
+        { "id": 18, "branch_id": "br-c", "name": "health-alive", "passed": true, "detail": "healthy" }
       ],
       "events": [
-        { "id": 1, "run_id": "run-demo", "at": "2026-10-17T20:10:00Z", "kind": "provision", "message": "Base sandbox created and webhook service started on :8080" },
-        { "id": 2, "run_id": "run-demo", "at": "2026-10-17T20:10:08Z", "kind": "fork", "message": "Base paused; forked 3 byte-identical micro-VMs in parallel" },
-        { "id": 3, "run_id": "run-demo", "at": "2026-10-17T20:10:20Z", "kind": "patch", "message": "Builder agent generated 3 candidate fixes via OpenRouter" },
-        { "id": 4, "run_id": "run-demo", "at": "2026-10-17T20:10:30Z", "kind": "attack", "message": "Red team attacking 3 forks over private network (10.0.60.0/24)" },
-        { "id": 5, "run_id": "run-demo", "at": "2026-10-17T20:10:45Z", "kind": "verdict", "message": "patch-a killed (17), patch-c killed (67), patch-b survived (100)" },
-        { "id": 6, "run_id": "run-demo", "at": "2026-10-17T20:10:48Z", "kind": "cleanup", "message": "Losers destroyed; patch-b promoted to production" }
+        { "id": 1, "run_id": "run-demo", "at": "2026-10-17T20:10:00Z", "kind": "provision", "message": "Base micro-VM initialized with webhook fulfillment service on 10.0.60.10:8080" },
+        { "id": 2, "run_id": "run-demo", "at": "2026-10-17T20:10:08Z", "kind": "fork", "message": "Base state paused; forked 3 byte-identical micro-VMs in parallel (RAM & processes copied in 42ms)" },
+        { "id": 3, "run_id": "run-demo", "at": "2026-10-17T20:10:20Z", "kind": "patch", "message": "Builder agent generated 3 candidate algorithmic fixes via OpenRouter" },
+        { "id": 4, "run_id": "run-demo", "at": "2026-10-17T20:10:30Z", "kind": "attack", "message": "Adversarial red-team launching 6 stress vectors over private subnet (10.0.60.0/24)" },
+        { "id": 5, "run_id": "run-demo", "at": "2026-10-17T20:10:45Z", "kind": "verdict", "message": "Candidate A killed (score 17), Candidate C killed (score 67), Candidate B survived (score 100)" },
+        { "id": 6, "run_id": "run-demo", "at": "2026-10-17T20:10:48Z", "kind": "cleanup", "message": "Eliminated micro-VMs destroyed; Candidate B promoted to live production route" }
       ]
     };
 
@@ -1497,10 +1498,16 @@
       container.innerHTML = "";
 
       const codeSnippets = {
-        "dw-demo-a": `// Fix A: After-work check\nif (seen.has(event.id)) return;\nawait processFulfillment(event);\nseen.add(event.id);`,
-        "dw-demo-b": `// Fix B: Atomic in-flight claim\nif (!inFlight.add(event.id)) return 409;\ntry { await processFulfillment(event); }\nfinally { inFlight.delete(event.id); }`,
-        "dw-demo-c": `// Fix C: Mutex with timeout\nconst lock = await mutex.acquire();\ntry { await process(event); }\nfinally { lock.release(); }`
+        "dw-demo-a": `// Patch A: Post-fulfillment deduplication\nif (seen.has(event.id)) return;\nawait processWebhookFulfillment(event);\nseen.add(event.id); // 50ms race window`,
+        "dw-demo-b": `// Patch B: Atomic in-flight reservation\nif (!inFlight.add(event.id)) return 409;\ntry { await processWebhookFulfillment(event); }\nfinally { inFlight.delete(event.id); }`,
+        "dw-demo-c": `// Patch C: Global mutex lock\nconst lock = await mutex.acquire();\ntry { await processWebhookFulfillment(event); }\nfinally { lock.release(); } // Deadlock under load`
       };
+
+      const patchSubtitles = [
+        "Post-Execution Check",
+        "Atomic In-Flight Locking",
+        "Global Mutex Lock"
+      ];
 
       candidates.forEach((b, idx) => {
         const isWinner = b.status === "promoted" || (run.winner_branch_id === b.id);
@@ -1544,15 +1551,16 @@
         }
 
         const scoreVal = b.score !== null ? b.score : (isWinner ? 100 : (isKilled ? 17 : 50));
+        const subtitle = patchSubtitles[idx] || "Algorithmic Patch";
 
         card.innerHTML = `
           <div class="card-top-bar">
-            <span class="card-index">0${idx + 1}</span>
+            <span class="card-index">0${idx + 1} · dw-fork-${String.fromCharCode(97 + idx)}</span>
             <span class="card-ip">${b.sandbox_ip || "10.0.60.1" + (idx + 1)}</span>
             <span class="badge-status ${statusClass}">${statusText}</span>
           </div>
 
-          <h3 class="card-title">Candidate Fix ${String.fromCharCode(65 + idx)}</h3>
+          <h3 class="card-title">Candidate Patch ${String.fromCharCode(65 + idx)} · <span style="font-weight: 500; font-size: 15px; color: #64748b;">${subtitle}</span></h3>
           <p class="card-strategy">${b.patch_rationale || "Analyzing race condition and generating patch..."}</p>
 
           <pre class="card-code"><code>${escapeHtml(patchCode)}</code></pre>
