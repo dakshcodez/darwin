@@ -85,7 +85,8 @@ export interface ExecResult {
 
 /** Run one command to completion. Never run a background job here (it blocks): use startProcess. */
 export async function exec(box: Box, cmd: string, args: string[] = [], opts: { env?: Record<string, string>; timeoutMs?: number } = {}): Promise<ExecResult> {
-  const { result, exec_ms } = await box.sandbox.runCommand(cmd, args, { env: opts.env, timeoutMs: opts.timeoutMs ?? T.exec });
+  // retry: false because the SDK's default retry re-sends a timed-out exec, which would run the same attack again
+  const { result, exec_ms } = await box.sandbox.runCommand(cmd, args, { env: opts.env, timeoutMs: opts.timeoutMs ?? T.exec, retry: false });
   return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exit_code, ms: exec_ms };
 }
 
