@@ -184,14 +184,25 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
     await ev("fork", `${forks.length}/${n} candidates ready: ${forks.length - copies.length} forks, ${copies.length} fresh copies (${((Date.now() - t) / 1000).toFixed(1)}s)`);
     if (forks.length === 0) throw new Error("no forks could be created");
 
-    // 3. The base sandbox becomes the red team: it is already counted in our slots and already on the private
-    //    network, so resuming it needs no new sandbox and no waiting for a destroyed one to free its slot.
+    // 3. Red team. Preferred: resume the base (already counted in our slots, already on the private network, so no
+    //    new sandbox and no waiting for a destroyed one to release its slot). Resuming is a snapshot restore like a
+    //    fork and sometimes stalls, so after 45 s we fall back to promoting one of the running forks to red team
+    //    (one candidate fewer, still no extra slot).
     t = Date.now();
-    await os.resumeBox(base);
-    await base.sandbox.refresh();
-    const red: os.Box = { ...base, ip: base.sandbox.ip ?? base.ip };
-    await os.attachNetwork(red, net.id).catch(() => undefined); // normally still a member; harmless if already attached
-    await ev("provision", `red team = the resumed base sandbox ${red.name} (${red.ip}), no extra slot needed (${((Date.now() - t) / 1000).toFixed(1)}s)`);
+    let red: os.Box;
+    try {
+      await os.withDeadline(45_000, "resume base", () => os.resumeBox(base));
+      await base.sandbox.refresh();
+      red = { ...base, ip: base.sandbox.ip ?? base.ip };
+      await os.attachNetwork(red, net.id).catch(() => undefined); // normally still a member; harmless if already attached
+      await ev("provision", `red team = the resumed base sandbox ${red.name} (${red.ip}), no extra slot needed (${((Date.now() - t) / 1000).toFixed(1)}s)`);
+    } catch (e) {
+      if (forks.length < 2) throw new Error(`base resume failed (${(e as Error).message}) and only ${forks.length} fork(s) are available`);
+      red = forks.pop()!;
+      await os.attachNetwork(red, net.id).catch(() => undefined);
+      await ev("error", `base resume stalled (${(e as Error).message}); using fork ${red.name} (${red.ip}) as the red team instead, racing ${forks.length} candidates`);
+      void os.destroyBox(base, { wait: false }).catch(() => undefined);
+    }
 
     const patches = await patchesP;
     const attackScript = await agents.getAttackScript({ sourceFiles: files });
