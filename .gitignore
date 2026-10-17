@@ -19,3 +19,6 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Darwin run output (winning patches saved next to the target project)
+.darwin/
