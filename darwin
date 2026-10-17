@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 # Darwin CLI launcher: ./darwin run examples/slugify ...  (from the repo root)
+export NODE_NO_WARNINGS=1 DOTENV_CONFIG_QUIET=true
 cd "$(dirname "$0")" && exec npx --no-install tsx cli/darwin.ts "$@"

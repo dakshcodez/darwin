@@ -26,6 +26,7 @@ ${c.bold("options for run")}
   -n, --candidates N  candidate fixes to race (2-4, default 3)
   --egress <host>     host a fork may reach while testing (repeatable; default: none)
   --apply             write the winning files into your project (default: save a patch under .darwin/)
+  --flat              flat boxes instead of the 3D cubes (automatic on short terminals)
   --plain             no live view, print events as they happen
 
 ${c.bold("how it works")}
@@ -48,7 +49,7 @@ async function cmdRun(argv: string[]) {
     options: {
       example: { type: "string" }, bug: { type: "string" }, test: { type: "string" }, install: { type: "string" },
       candidates: { type: "string", short: "n" }, egress: { type: "string", multiple: true },
-      apply: { type: "boolean" }, plain: { type: "boolean" },
+      apply: { type: "boolean" }, plain: { type: "boolean" }, flat: { type: "boolean" },
     },
   });
   const target = loadTarget({
@@ -68,7 +69,7 @@ async function cmdRun(argv: string[]) {
 
   const ctx = () => ({
     targetName: target.name, testCmd: target.mode === "command" ? target.test : undefined, bug: target.bug,
-    startedAt: started, frame: frameNo++, cols: process.stdout.columns ?? 100, endpoint: cfg.sandboxBaseUrl, model: modelName(),
+    startedAt: started, frame: frameNo++, cols: process.stdout.columns ?? 100, rows: process.stdout.rows ?? 50, flat: values.flat, endpoint: cfg.sandboxBaseUrl, model: modelName(),
   });
   const poll = async () => {
     if (!runId || polling || Date.now() - lastPoll < 700) return;
@@ -100,17 +101,17 @@ async function cmdRun(argv: string[]) {
 
   const secs = ((Date.now() - started) / 1000).toFixed(0);
   console.log("");
-  if (failure) { console.log(`${c.bold(c.red("✖ run failed"))}  ${c.white(failure.message)}`); await db.close(); process.exit(1); }
+  if (failure) { console.log(`${c.bold(c.red("× run failed"))}  ${c.white(failure.message)}`); await db.close(); process.exit(1); }
   if (result?.winnerBranchId) {
     const win = state?.branches.find((b) => b.id === result!.winnerBranchId);
     console.log(`${c.bold(c.green("★ winner"))}  ${c.white(win?.sandbox_name ?? result.winnerBranchId)}  ${c.gray(`score ${win?.score ?? "?"} · ${secs}s`)}`);
     if (win?.patch_rationale) console.log(`${c.gray("idea")}    ${c.white(win.patch_rationale)}`);
     if (result.diff) {
       console.log("\n" + colorDiff(result.diff));
-      console.log(values.apply ? `${c.green("✔")} applied to ${target.dir}` : `${c.gray("saved")}   ${result.patchDir}/winner.patch   ${c.gray("(re-run with --apply to write it into your project)")}`);
+      console.log(values.apply ? `${c.green("✓")} applied to ${target.dir}` : `${c.gray("saved")}   ${result.patchDir}/winner.patch   ${c.gray("(re-run with --apply to write it into your project)")}`);
     }
   } else {
-    console.log(`${c.bold(c.red("✖ no candidate survived"))}  ${c.gray(`${secs}s · nothing promoted`)}`);
+    console.log(`${c.bold(c.red("× no candidate survived"))}  ${c.gray(`${secs}s · nothing promoted`)}`);
   }
   await db.close();
   process.exit(result?.winnerBranchId ? 0 : 1);
@@ -122,7 +123,7 @@ async function cmdStatus() {
   const state = await db.runState();
   await db.close();
   if (!state.run) { console.log("no runs yet"); return; }
-  console.log(frame(state, { targetName: `run ${state.run.id}`, startedAt: Date.now(), frame: 0, cols: process.stdout.columns ?? 100, endpoint: cfg.sandboxBaseUrl, model: modelName() }).join("\n"));
+  console.log(frame(state, { targetName: `run ${state.run.id}`, startedAt: Date.now(), frame: 0, cols: process.stdout.columns ?? 100, rows: process.stdout.rows ?? 50, endpoint: cfg.sandboxBaseUrl, model: modelName() }).join("\n"));
 }
 
 async function cmdCleanup() {
