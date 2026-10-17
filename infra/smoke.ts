@@ -64,3 +64,5 @@ try {
   console.log("quota after:", await os.quota(client));
   lap("total", t0);
 }
+
+process.exit(0); // the SDK keeps sockets open; exit explicitly or the script never ends
