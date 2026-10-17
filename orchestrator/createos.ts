@@ -184,14 +184,29 @@ export interface Quota {
   paused: number;
   other: number;
   total: number;
-  /** concurrent sandboxes counting against the cap (paused ones count) */
+  /** concurrent sandboxes counting against the cap: running + paused + transitional (destroying, forking, failed) */
   live: number;
 }
 
 export async function quota(client: CreateosSandboxClient): Promise<Quota> {
   const w = await client.whoami();
   const s = w.stats;
-  return { running: s.running, paused: s.paused, other: s.other, total: s.total, live: s.running + s.paused };
+  return { running: s.running, paused: s.paused, other: s.other, total: s.total, live: s.running + s.paused + s.other };
+}
+
+/**
+ * Wait until at least `needed` slots are free under the cap (default 5). Destroyed sandboxes keep counting in the
+ * "other" bucket for a while, so back-to-back runs must wait or they hit `429 concurrent quota reached`.
+ */
+export async function waitForSlots(client: CreateosSandboxClient, needed: number, opts: { cap?: number; timeoutMs?: number } = {}): Promise<Quota> {
+  const cap = opts.cap ?? 5;
+  const deadline = Date.now() + (opts.timeoutMs ?? 120_000);
+  for (;;) {
+    const q = await quota(client);
+    if (q.live + needed <= cap) return q;
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${needed} free slot(s); ${q.live}/${cap} in use (running ${q.running}, paused ${q.paused}, transitional ${q.other})`);
+    await new Promise((r) => setTimeout(r, 2_000));
+  }
 }
 
 /** Destroy every non-destroyed sandbox whose name starts with our prefix, plus any named network. */
