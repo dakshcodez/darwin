@@ -6,7 +6,7 @@ Coding agents write fixes fast, but you can't trust any single patch and you sho
 
 Built for the **CreateOS × Stripe Projects "Build Agents That Run Code" hackathon**. The whole stack is provisioned with **Stripe Projects**, and every line of agent-written code runs inside the **CreateOS Sandbox**, never on the host.
 
-> **Links:** demo video: _add YouTube link_ · post: _add X / LinkedIn link_ · leaderboard: projects.dev/leaderboard (code `CreateOS-2026`)
+> **Live:** https://darwin-tr7p.onrender.com (browse freely; starting a race needs an access token, see Deploying) · **Links:** demo video: _add YouTube link_ · post: _add X / LinkedIn link_ · leaderboard: projects.dev/leaderboard (code `CreateOS-2026`)
 
 ---
 
@@ -242,6 +242,20 @@ Honest caveats:
 | `DARWIN_MODEL`, `DARWIN_MODELS` | Model for the webhook demo; rotation list for test-based mode |
 | `DARWIN_AGENTS=real` | Use the webhook demo's real agents (`agents/`) instead of stubs |
 | `STRIPE_WEBHOOK_SECRET`, `DARWIN_TRIGGER_EVENT` | Let a signed Stripe test event start a race |
+| `DARWIN_ADMIN_TOKEN`, `DARWIN_MIN_INTERVAL_SEC` | Access token and minimum seconds between race starts (see Deploying) |
+
+## Deploying
+
+`render.yaml` is a Render Blueprint for a single web service that serves the API, the landing page and `/arena`. It must stay a **single instance** (the server keeps "a race is running" in memory). Secrets are `sync: false` and are set in Render, never in git:
+
+```bash
+render blueprints validate render.yaml
+render services create --name darwin --type web_service --repo https://github.com/<you>/darwin --branch main \
+  --runtime node --plan free --build-command "npm ci --include=dev" --start-command "npx tsx orchestrator/server.ts" \
+  --health-check-path /api/health --num-instances 1 --env-var KEY=VALUE ...
+```
+
+Starting a race spends sandboxes and LLM quota, so a hosted server is protected: `POST /api/runs` needs the `DARWIN_ADMIN_TOKEN` in an `x-darwin-token` header (the arena asks for it once per tab), starts are rate-limited (`DARWIN_MIN_INTERVAL_SEC`, 240 s by default when hosted), a hosted server with no token refuses all starts, and no CORS headers are sent. Reading runs stays public. On Render's free plan the service sleeps when idle, so the first request after a pause is slow.
 
 ## Project layout
 
