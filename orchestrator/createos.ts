@@ -164,9 +164,10 @@ export async function resumeBox(box: Box): Promise<void> {
   await box.sandbox.waitUntilRunning({ timeoutMs: T.pause });
 }
 
-export async function destroyBox(box: Pick<Box, "sandbox">): Promise<void> {
+/** Destroy a sandbox. `wait: false` returns as soon as the destroy is accepted (EU destroys take 30-90 s to finish). */
+export async function destroyBox(box: Pick<Box, "sandbox">, opts: { wait?: boolean } = {}): Promise<void> {
   await box.sandbox.destroy({ timeoutMs: T.destroy });
-  await box.sandbox.waitUntilDestroyed({ timeoutMs: T.destroy }).catch(() => undefined);
+  if (opts.wait !== false) await box.sandbox.waitUntilDestroyed({ timeoutMs: T.destroy }).catch(() => undefined);
 }
 
 /** Lock a sandbox's outbound traffic. Always pass the red team's IP so private-network attacks still reach it. */
