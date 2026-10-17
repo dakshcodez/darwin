@@ -42,7 +42,7 @@ export interface CommandRaceResult {
 const toAbs = (files: Record<string, string>) => Object.fromEntries(Object.entries(files).map(([p, c]) => [path.posix.join(os.APP_DIR, p), c]));
 const patchSize = (p: Patch) => Object.values(p.files).reduce((a, c) => a + c.length, 0);
 
-function unifiedDiff(targetDir: string, files: Record<string, string>): string {
+export function unifiedDiff(targetDir: string, files: Record<string, string>): string {
   const tmp = mkdtempSync(path.join(tmpdir(), "darwin-diff-"));
   let out = "";
   try {
@@ -161,7 +161,7 @@ export async function runCommandRace(opts: CommandRaceOptions): Promise<CommandR
     const patches = await patchesP;
     const branches = forks.map((box, i) => ({ box, patch: patches[i] as Patch | undefined, id: `${runId}-${patches[i]?.id ?? `fork-${i + 1}`}` }));
     for (const b of branches) {
-      await db.upsertBranch({ id: b.id, runId, parentId: baseId, sandboxId: b.box.id, sandboxName: b.box.name, sandboxIp: b.box.ip, status: "patching", patchRationale: b.patch?.rationale ?? null });
+      await db.upsertBranch({ id: b.id, runId, parentId: baseId, sandboxId: b.box.id, sandboxName: b.box.name, sandboxIp: b.box.ip, status: "patching", patchRationale: b.patch?.rationale ?? null, patchDiff: b.patch && Object.keys(b.patch.files).length ? unifiedDiff(target.dir, b.patch.files).slice(0, 8000) : null });
     }
     const reports: AttackReport[] = [];
     await Promise.all(branches.map(async (b) => {
