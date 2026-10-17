@@ -54,7 +54,7 @@ function unifiedDiff(targetDir: string, files: Record<string, string>): string {
         execFileSync("git", ["diff", "--no-index", "--no-color", "--src-prefix=a/", "--dst-prefix=b/", path.join(targetDir, rel), b], { encoding: "utf8" });
       } catch (e) {
         // git diff --no-index exits 1 when the files differ; the diff is on stdout
-        out += ((e as { stdout?: string }).stdout ?? "").replaceAll(path.join(targetDir, rel), rel).replaceAll(b, rel);
+        out += ((e as { stdout?: string }).stdout ?? "").replaceAll(path.join(targetDir, rel), "/" + rel).replaceAll(b, "/" + rel);
       }
     }
   } finally {
