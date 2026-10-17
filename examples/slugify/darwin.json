@@ -1,5 +1,5 @@
 {
   "name": "slugify",
-  "bug": "slugify() only lowercases and replaces single spaces. It must also trim and collapse whitespace and repeated separators, strip accents (Crème Brûlée -> creme-brulee), drop punctuation and symbols between words, and never return leading or trailing dashes.",
+  "bug": "slugify() only lowercases and replaces single spaces. It must also trim and collapse whitespace and repeated separators, strip accents (Cr\u00e8me Br\u00fbl\u00e9e -> creme-brulee), transliterate special Latin letters (\u00df -> ss, \u00e6 -> ae, \u00f8 -> o), drop punctuation and symbols between words, keep digits, and never return leading or trailing dashes.",
   "test": "npm test"
 }

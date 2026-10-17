@@ -9,3 +9,6 @@ test("collapses repeated separators", () => assert.strictEqual(slugify("a--b__c"
 test("drops symbols between words", () => assert.strictEqual(slugify("C++ & Rust"), "c-rust"));
 test("no leading or trailing dashes", () => assert.strictEqual(slugify("---Already-Slug---"), "already-slug"));
 test("empty string stays empty", () => assert.strictEqual(slugify(""), ""));
+test("transliterates special letters (ß -> ss)", () => assert.strictEqual(slugify("Straße"), "strasse"));
+test("transliterates ligatures and slashed letters", () => assert.strictEqual(slugify("Ærø & Østerbro"), "aero-osterbro"));
+test("keeps digits and drops percent signs", () => assert.strictEqual(slugify("100% Pure Juice"), "100-pure-juice"));
