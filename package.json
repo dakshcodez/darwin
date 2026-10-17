@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "db:apply": "tsx infra/apply-schema.ts",
     "doctor": "tsx infra/doctor.ts",
-    "dev": "tsx orchestrator/server.ts"
+    "dev": "tsx orchestrator/server.ts",
+    "race": "tsx orchestrator/run-once.ts",
+    "cleanup": "tsx infra/cleanup.ts",
+    "smoke": "tsx infra/smoke.ts"
   },
   "dependencies": {
     "@nodeops-createos/sandbox": "^0.8.2",
