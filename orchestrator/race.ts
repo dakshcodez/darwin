@@ -130,12 +130,18 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
     const patchesP = agents.generatePatches({ sourceFiles: files, bugReport: opts.bugReport ?? DEFAULT_BUG, n });
     patchesP.catch(() => undefined); // surfaced when awaited below; avoids an unhandled rejection if forking fails first
     t = Date.now();
-    const forkResults = await Promise.allSettled(Array.from({ length: n }, () => os.forkBox(base)));
     const forks: os.Box[] = [];
-    forkResults.forEach((r, i) => {
-      if (r.status === "fulfilled") { forks.push(r.value); created.push(r.value); }
-      else void ev("error", `fork ${i + 1} failed: ${(r.reason as Error).message}`);
-    });
+    let wanted = n;
+    for (let attempt = 1; attempt <= 2 && wanted > 0; attempt++) {
+      const results = await Promise.allSettled(Array.from({ length: wanted }, () => os.forkBox(base)));
+      let failed = 0;
+      results.forEach((r) => {
+        if (r.status === "fulfilled") { forks.push(r.value); created.push(r.value); }
+        else { failed++; void ev("error", `fork attempt ${attempt} failed: ${(r.reason as Error).message}`); }
+      });
+      wanted = failed;
+      if (failed && attempt < 2) await ev("fork", `retrying ${failed} stuck fork(s)`);
+    }
     await ev("fork", `${forks.length}/${n} forks running (${((Date.now() - t) / 1000).toFixed(1)}s)`);
     if (forks.length === 0) throw new Error("no forks could be created");
 
