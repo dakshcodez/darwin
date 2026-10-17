@@ -12,12 +12,12 @@ import { describeStack, stackSummary } from "./stripe-projects.js";
 
 /**
  * One Darwin run:
- *   base (service running) -> pause -> fork xN -> drop base -> red team joins the network
+ *   base (service running) -> pause -> fork xN -> resume the base as the red team
  *   -> per fork: attach, lock egress to the red team, apply patch, restart service, attack
  *   -> judge -> delete the losers, promote the survivor.
  *
- * Quota: max concurrent sandboxes = N forks + base (until dropped) = 4 with N=3, then N forks + red = 4.
- * We never touch the 5-sandbox cap exactly because a fork that lands on the cap hung in testing.
+ * Quota: the base doubles as the red team, so the peak is base + N forks = 4 with N=3 (no sixth creation, no waiting
+ * for a destroyed sandbox to release its slot). We avoid landing exactly on the 5-sandbox cap: that hangs a fork.
  */
 
 export interface RaceOptions {
@@ -184,13 +184,14 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
     await ev("fork", `${forks.length}/${n} candidates ready: ${forks.length - copies.length} forks, ${copies.length} fresh copies (${((Date.now() - t) / 1000).toFixed(1)}s)`);
     if (forks.length === 0) throw new Error("no forks could be created");
 
-    // 3. Drop the base (frees a slot), then bring in the red team on the same network
-    await os.destroyBox(base).catch(() => undefined);
-    await ev("cleanup", "base sandbox destroyed (waiting for the slot to free)");
-    await os.waitForSlots(client, 1, { cap: 4 }); // red team needs one slot; cap 4 keeps one spare so we never land exactly on 5/5
-    const red = await os.createBox(client, { name: `${runId}-red`, networkId: net.id });
-    created.push(red);
-    await ev("provision", `red-team sandbox ${red.name} (${red.ip}) joined the network`);
+    // 3. The base sandbox becomes the red team: it is already counted in our slots and already on the private
+    //    network, so resuming it needs no new sandbox and no waiting for a destroyed one to free its slot.
+    t = Date.now();
+    await os.resumeBox(base);
+    await base.sandbox.refresh();
+    const red: os.Box = { ...base, ip: base.sandbox.ip ?? base.ip };
+    await os.attachNetwork(red, net.id).catch(() => undefined); // normally still a member; harmless if already attached
+    await ev("provision", `red team = the resumed base sandbox ${red.name} (${red.ip}), no extra slot needed (${((Date.now() - t) / 1000).toFixed(1)}s)`);
 
     const patches = await patchesP;
     const attackScript = await agents.getAttackScript({ sourceFiles: files });
@@ -247,18 +248,20 @@ export async function runRace(opts: RaceOptions): Promise<RaceResult> {
       await ev("verdict", "no branch survived; nothing promoted");
     }
 
-    // 6. Clean up everything except the winner
+    // 6. Clean up everything except the winner. Destroys are issued in parallel and not awaited to completion
+    //    (they take 30-90 s on the EU endpoint); the next run waits for the slots itself.
     const keep = opts.keepWinner === false ? null : winner;
-    for (const b of branches) {
-      if (b.id === keep) continue;
-      await os.destroyBox(b.box).catch(() => undefined);
-    }
-    await os.destroyBox(red).catch(() => undefined);
+    await Promise.allSettled([
+      ...branches.filter((b) => b.id !== keep).map((b) => os.destroyBox(b.box, { wait: false })),
+      os.destroyBox(red, { wait: false }),
+    ]);
     await ev("cleanup", keep ? `losers and red team destroyed; ${keep} left running` : "all sandboxes destroyed");
-    if (!keep) await os.deleteNetwork(client, net.id).catch(() => undefined);
-    netId = keep ? undefined : netId; // the network stays while the winner is a member
+    if (!keep) {
+      // a network can only be deleted once it has no members, so this is best effort (cleanup.ts retries it later)
+      setTimeout(() => void os.deleteNetwork(client, net.id).catch(() => undefined), 90_000).unref();
+    }
+    netId = undefined;
 
-    if (timedOut) throw new Error("run aborted by the watchdog");
     await db.setRunStatus(runId, "done", winner);
     return { runId, winnerBranchId: winner, verdicts };
   } catch (e) {
